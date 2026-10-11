@@ -1,0 +1,202 @@
+/* watchdog-status.css — "eye" indicator for the print-watchdog AI monitor (dev add-on). */
+
+#ws-eye {
+	position: fixed;
+	top: 14px;
+	right: 58px;
+	z-index: 500;
+	width: 38px;
+	height: 38px;
+	border-radius: 50%;
+	border: 1px solid rgba(255, 255, 255, .1);
+	background: rgba(30, 30, 30, .85);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: background .15s ease;
+}
+#ws-eye:hover { background: rgba(40, 40, 40, .95); }
+#ws-eye { cursor: pointer; }
+
+/* бейдж с числом накопленных алертов, не сброшенных "Очистить" */
+#ws-badge {
+	position: absolute;
+	top: -3px;
+	right: -3px;
+	min-width: 15px;
+	height: 15px;
+	padding: 0 3px;
+	border-radius: 8px;
+	background: #ef5350;
+	color: #fff;
+	font-size: 9px;
+	font-weight: bold;
+	line-height: 15px;
+	text-align: center;
+	box-shadow: 0 0 0 2px rgba(30, 30, 30, .9);
+}
+#ws-badge[hidden] { display: none; }
+
+/* свой текст-статус вместо стандартного title-тултипа браузера — на прозрачном фоне, шрифт/цвет
+   в тон остальному интерфейсу, появляется только при наведении на глазик */
+#ws-tip {
+	position: fixed;
+	top: 56px;
+	right: 77px;
+	transform: translateX(50%);
+	z-index: 500;
+	font-size: 11px;
+	letter-spacing: .02em;
+	color: var(--text-color);
+	white-space: nowrap;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity .15s ease;
+	text-shadow: 0 1px 3px rgba(0, 0, 0, .6);
+}
+#ws-eye:hover ~ #ws-tip { opacity: 1; }
+
+/* --- отчёт по клику --- */
+#ws-report {
+	position: fixed;
+	top: 58px;
+	right: 14px;
+	z-index: 501;
+	width: min(300px, calc(100vw - 28px));
+	max-height: 70vh;
+	overflow-y: auto;
+	background: var(--tile-bg-color, #1e1e1e);
+	border: 1px solid rgba(255, 255, 255, .1);
+	border-radius: 10px;
+	box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
+	padding: 12px 14px 14px;
+	text-align: left;
+}
+#ws-report[hidden] { display: none; }
+.ws-report-title {
+	display: flex; align-items: center; gap: 8px;
+	font-weight: bold;
+	color: var(--title-text-color);
+	margin-bottom: 8px;
+	padding-bottom: 8px;
+	border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+.ws-report-title i { color: var(--link-color); }
+.ws-report-printer { margin-bottom: 10px; }
+.ws-report-printer:last-child { margin-bottom: 0; }
+.ws-report-pname { font-weight: bold; font-size: 13px; color: var(--title-text-color); margin-bottom: 2px; }
+.ws-report-line { font-size: 12.5px; color: var(--text-color); line-height: 1.5; }
+.ws-report-line.ws-report-muted { color: var(--lowlight-color, #888); }
+.ws-report-line.ws-report-ok { color: #66bb6a; }
+.ws-report-line.ws-report-warn { color: #ffb300; }
+
+.ws-report-footer {
+	display: flex; gap: 8px;
+	margin-top: 10px;
+	padding-top: 10px;
+	border-top: 1px solid rgba(255, 255, 255, .08);
+}
+.ws-log-toggle-btn, .ws-log-clear-btn {
+	display: inline-flex; align-items: center; gap: 6px;
+	padding: 5px 10px;
+	border-radius: 6px;
+	border: 1px solid rgba(255, 255, 255, .12);
+	background: rgba(255, 255, 255, .05);
+	color: var(--text-color);
+	cursor: pointer;
+	font-size: 11.5px;
+}
+.ws-log-toggle-btn:hover, .ws-log-clear-btn:hover { background: rgba(255, 255, 255, .1); color: var(--title-text-color); }
+.ws-log-toggle-btn.ws-log-open { background: var(--link-color); border-color: var(--link-color); color: #fff; }
+
+.ws-log-body {
+	margin-top: 8px;
+	max-height: 220px;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.ws-log-body[hidden] { display: none; }
+.ws-log-item { font-size: 11.5px; line-height: 1.5; color: var(--text-color); border-bottom: 1px solid rgba(255, 255, 255, .05); padding-bottom: 6px; }
+.ws-log-item:last-child { border-bottom: none; }
+.ws-log-time { color: var(--lowlight-color, #888); }
+.ws-log-printer { color: var(--title-text-color); font-weight: bold; }
+.ws-log-alert .ws-log-msg { color: #ffb300; }
+.ws-log-error .ws-log-msg { color: var(--lowlight-color, #888); }
+
+.ws-eye-svg { width: 26px; height: auto; overflow: visible; }
+
+/* сама "глазная зона" — склера/радужка/зрачок и веко общие для всех состояний,
+   меняется только их цвет/интенсивность в зависимости от состояния */
+.ws-sclera { fill: #3a3d42; }
+.ws-iris { fill: var(--lowlight-color, #666); transition: fill .4s ease; }
+.ws-pupil { fill: #16181b; }
+.ws-glint { fill: rgba(255, 255, 255, .55); }
+.ws-outline { fill: none; stroke: rgba(255, 255, 255, .12); stroke-width: 1; }
+
+/* веко — заливка в тон корпуса кружка-индикатора, чтобы реально "закрывать" глаз, а не просто
+   тускнеть/пульсировать. Форма века совпадает с вырезом глаза (ws-eye-clip), поэтому в закрытом
+   виде перекрывает его без зазоров. Ресницы — дети того же <g>, масштабируются вместе с веком. */
+.ws-lid { fill: #232529; }
+.ws-lashes line { stroke: #17181a; stroke-width: 1.1; stroke-linecap: round; }
+
+/* исходное положение века — схлопнуто в нулевую высоту от ВЕРХНЕЙ точки глаза (20,1), т.е.
+   полностью невидимо, а не просто сдвинуто за край (реснички не "просвечивают" поверх зрачка в
+   покое). Точка опоры сверху — значит веко растёт вниз (закрывается сверху вниз, как настоящее
+   верхнее веко) и при открытии убирается обратно вверх (снизу вверх), а не схлопывается
+   посередине. Не слишком быстро и не слишком медленно: ~250мс на закрытие/открытие, короткая
+   пауза в закрытом виде. */
+.ws-lid-group { transform: scaleY(0); transform-origin: 20px 1px; }
+.ws-lid-group.ws-blink { animation: ws-blink-once .62s cubic-bezier(.4, 0, .2, 1); }
+@keyframes ws-blink-once {
+	0%   { transform: scaleY(0); }
+	40%  { transform: scaleY(1); }
+	60%  { transform: scaleY(1); }
+	100% { transform: scaleY(0); }
+}
+
+/* --- состояние: сервис недоступен — серо, статично, без моргания --- */
+#ws-eye.ws-state-down .ws-sclera { fill: #2c2e31; }
+#ws-eye.ws-state-down .ws-iris { fill: #55585d; }
+#ws-eye.ws-state-down .ws-pupil { fill: #1a1b1d; }
+#ws-eye.ws-state-down .ws-glint { opacity: .15; }
+
+/* --- состояние: активно, принтеры простаивают — приглушённо, редкое моргание --- */
+#ws-eye.ws-state-idle .ws-sclera { fill: #3d4046; }
+#ws-eye.ws-state-idle .ws-iris { fill: #4a90c4; }
+#ws-eye.ws-state-idle .ws-glint { opacity: .5; }
+
+/* --- состояние: идёт проверка кадров печатающегося принтера — ярко, частое моргание --- */
+#ws-eye.ws-state-watching { background: rgba(33, 150, 243, .12); }
+#ws-eye.ws-state-watching .ws-sclera { fill: #454a52; }
+#ws-eye.ws-state-watching .ws-iris { fill: #29b6f6; filter: drop-shadow(0 0 2px rgba(41, 182, 246, .7)); }
+#ws-eye.ws-state-watching .ws-glint { opacity: .9; }
+
+/* --- "Око Саурона": включается либо когда watchdog реально обнаружил возможный сбой печати
+   (на 2 минуты), либо вручную на 5 быстрых кликов подряд по глазику (пасхалка). Огненная
+   радужка (градиент из defs), зрачок-щель вместо круглого, не моргает — веко силой держится
+   открытым. Эти правила идут ПОСЛЕ состояний (down/idle/watching) в файле, чтобы иметь тот же
+   приоритет специфичности и всё равно побеждать по порядку каскада. */
+#ws-eye.ws-sauron { background: rgba(180, 40, 0, .18); }
+#ws-eye.ws-sauron .ws-sclera { fill: #1a0505; }
+#ws-eye.ws-sauron .ws-iris {
+	fill: url(#ws-sauron-gradient);
+	animation: ws-sauron-flicker 1.6s ease-in-out infinite;
+}
+#ws-eye.ws-sauron .ws-pupil {
+	fill: #170400;
+	transform: scale(.28, 2.3);
+	transform-origin: 20px 12px;
+}
+#ws-eye.ws-sauron .ws-glint { opacity: 0; }
+#ws-eye.ws-sauron .ws-lid-group { animation: none !important; transform: scaleY(0) !important; }
+@keyframes ws-sauron-flicker {
+	0%, 100% { filter: drop-shadow(0 0 3px rgba(255, 90, 0, .8)); }
+	50%      { filter: drop-shadow(0 0 7px rgba(255, 150, 0, 1)); }
+}
+
+@media (max-width: 480px) {
+	#ws-eye { right: 54px; width: 34px; height: 34px; }
+	.ws-eye-svg { width: 22px; }
+}

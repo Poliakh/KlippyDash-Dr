@@ -1,0 +1,173 @@
+/* custom-controls.css — add-on styling for the under-camera control bar (not upstream). */
+
+.custom-controls {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	align-items: stretch;
+	gap: 6px;
+	margin: 10px auto 2px;
+	max-width: 800px;
+}
+
+.custom-controls > * {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
+	min-width: 62px;
+	padding: 7px 6px;
+	box-sizing: border-box;
+	cursor: pointer;
+	border-radius: 8px;
+	text-decoration: none;
+	color: var(--lowlight-color);
+	background: transparent;
+	transition: background .12s ease, color .12s ease;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+.custom-controls > *:hover { background: rgba(127, 127, 127, .18); }
+
+/* neutralize KlippyDash's oversized/floated control styling inside the bar */
+.custom-controls .control-e-stop,
+.custom-controls .control-resume,
+.custom-controls .control-pause,
+.custom-controls .control-cancel,
+.custom-controls .control-clear {
+	font-size: 1em;
+	padding: 7px 6px;
+	margin: 0;
+	float: none;
+}
+
+.custom-controls .icon { font-size: 1.5em; line-height: 1.1; pointer-events: none; }
+.custom-controls .cc-label {
+	font-size: 11px;
+	margin-top: 5px;
+	color: var(--text-color);
+	white-space: nowrap;
+	pointer-events: none;
+}
+
+/* accent colors for the added buttons */
+.cc-fw:hover .icon { color: #c58cff; }
+.cc-fluidd .icon  { color: var(--link-color); }
+
+/* Light toggle on-state */
+.cc-light .icon { color: var(--lowlight-color); }
+.cc-light.cc-on .icon { color: #ffcf4a; }
+
+/* No hidden buttons: keep the moved print controls always on the bar; dim + disable
+   (instead of removing) when the current state doesn't apply. Overrides .hidden here only. */
+.custom-controls .control-resume.hidden,
+.custom-controls .control-pause.hidden,
+.custom-controls .control-cancel.hidden,
+.custom-controls .control-clear.hidden,
+.custom-controls .control-e-stop.hidden {
+	display: flex !important;
+	visibility: visible !important;   /* stock .hidden also sets visibility:hidden — undo it */
+	opacity: .6;                      /* clearly visible but de-emphasized */
+	pointer-events: none;
+}
+
+/* Панель "Имя файла" + "Время печати" — зафиксирована по высоте и всегда показывает набор
+   полей, которые выводятся ВО ВРЕМЯ печати (Total/Remaining/Print/ETA/Filament), а не то
+   "complete-time"-состояние, которое штатно подменяет их после завершения. Так высота не
+   прыгает при смене состояния принтера (idle/printing/paused/complete). */
+.section-file,
+.section-printstats,
+.section-printstats .printing-container {
+	display: block !important;
+	visibility: visible !important;
+}
+.section-printstats .complete-time { display: none !important; }
+.section-file { min-height: 20px; margin-bottom: 14px; }
+.section-printstats { min-height: 118px; margin-top: 14px; }
+
+/* Print-times block: one value per line, values aligned in a column (labels differ in width). */
+.section-printstats .tile-line {
+	display: block !important;
+	width: auto !important;
+}
+.section-printstats .label {
+	display: inline-block;
+	min-width: 138px;   /* widest is "Remaining Time:" (~129px) */
+}
+
+/* Fans — своя ОТДЕЛЬНАЯ карточка (фон/бордер/скругления), print-status.js ставит её второй
+   в общий flex-ряд .ps-row рядом с .ps-card. Высота и отступ между карточками — на .ps-row. */
+.info-right {
+	flex: 0 0 172px;
+	display: flex;
+	flex-direction: column;
+	background: rgba(255, 255, 255, .025);
+	border: 1px solid rgba(255, 255, 255, .07);
+	border-radius: 10px;
+	overflow: hidden;
+	text-align: left;
+}
+.info-right-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px;                 /* = .ps-header/.tg-header */
+	background: rgba(255, 255, 255, .04);
+	border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+.info-right-icon { color: var(--link-color); font-size: 1.1em; }
+.info-right-title { font-weight: bold; color: var(--title-text-color); } /* без явного font-size — как .ps-title/.tg-title */
+
+.info-right-body { flex: 1; padding: 8px 12px 10px; }
+.cc-fan-row { display: flex; align-items: center; gap: 9px; padding: 4px 0; opacity: .5; }
+.cc-fan-row.cc-fan-active { opacity: 1; }
+.cc-fan-icon {
+	/* Свой SVG (не шрифтовая иконка) — вся геометрия рисуется сама и заведомо симметрична
+	   относительно (50,50) в viewBox, поэтому вращение вокруг геометрического центра бокса
+	   надёжно совпадает со зрительным центром (втулкой). Раньше тут была иконка шрифта fa-fan,
+	   у которой втулка не совпадала с центром бокса — при вращении описывала круг; ни
+	   flex-центрирование, ни подобранный вручную transform-origin не убрали это стабильно
+	   на всех углах, поэтому просто нарисовали свою форму. */
+	display: block;
+	width: 17px;
+	height: 17px;
+	flex: 0 0 auto;
+} /* цвет — inline, по смыслу вентилятора (settings.js) */
+.cc-fan-icon.spin {
+	animation-name: cc-fan-spin;
+	animation-timing-function: linear;
+	animation-iteration-count: infinite;
+	transform-origin: 50% 50%;
+	will-change: transform;
+	backface-visibility: hidden;
+}
+@keyframes cc-fan-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+.cc-fan-label { flex: 1; font-size: 12px; color: var(--text-color); }
+.cc-fan-val { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 32px; text-align: right; color: rgba(255, 255, 255, .72); }
+
+/* Штатные строки Extruder/Bed скрыты полностью — температуру теперь показывает только
+   карточка "Температуры" (temp-graph.js). Chamber-строка тут больше не создаётся вовсе. */
+.section-extruder, .section-bed, .section-chamber { display: none !important; }
+
+/* .hp-bar/.hp-fill/.hp-val — визуальный стиль тонкого бара мощности (без позиционирования).
+   Определены здесь, но переиспользуются в столбце "Мощность" карточки "Температуры"
+   (temp-graph.js/.css) — там своя обёртка .tg-power-wrap с обычным inline-flex, без absolute. */
+.hp-bar {
+	width: 44px; height: 5px; border-radius: 3px;
+	background: rgba(255, 255, 255, .12); overflow: hidden;
+}
+.hp-fill {
+	display: block; height: 100%; width: 0%;
+	background: #e0836b; border-radius: 3px; transition: width .3s ease;
+}
+.hp-val { min-width: 30px; color: var(--text-color); font-variant-numeric: tabular-nums; }
+
+/* E-Stop tinted danger */
+.custom-controls .control-e-stop .icon { color: #e2564b; }
+.custom-controls .control-e-stop:hover { background: rgba(226, 86, 75, .22); }
+
+/* --- responsive down to mobile (dev) --- */
+@media (max-width: 860px) {
+	.custom-controls { max-width: 100%; }
+}

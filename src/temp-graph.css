@@ -1,0 +1,171 @@
+/* temp-graph.css — styling for the Fluidd-style "Temperatures" table+chart card (dev add-on). */
+
+.tg-card {
+	margin-top: 14px;
+	background: rgba(255, 255, 255, .025);
+	border: 1px solid rgba(255, 255, 255, .07);
+	border-radius: 10px;
+	overflow: hidden;
+	text-align: left;
+}
+
+.tg-header {
+	padding: 10px 12px;
+	background: rgba(255, 255, 255, .04);
+	border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+.tg-header-icon { color: #ff7a3c; font-size: 1.1em; }
+.tg-title { font-weight: bold; color: var(--title-text-color); white-space: nowrap; margin-right: 4px; }
+
+.tg-header-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.tg-hdr-btn {
+	display: flex; align-items: center; gap: 6px;
+	font-size: 12px; color: var(--text-color);
+	cursor: pointer; padding: 5px 9px; border-radius: 6px;
+	white-space: nowrap;
+	border: 1px solid rgba(255, 255, 255, .08);
+	background: rgba(255, 255, 255, .03);
+	-webkit-user-select: none; user-select: none;
+}
+.tg-hdr-btn:hover { background: rgba(255, 255, 255, .08); color: var(--title-text-color); }
+
+.tg-preheat-btn .icon, .tg-preheat-btn .fa-fire { color: #ff7a3c; }
+.tg-preheat-btn.tg-waiting .fa-fire { animation: tg-pulse 1s ease-in-out infinite; }
+@keyframes tg-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.tg-cooldown-btn .fa-snowflake { color: #49a7ff; }
+.tg-caret { font-size: 10px; margin-left: 1px; opacity: .7; }
+
+.tg-preheat-wrap { position: relative; display: inline-block; }
+.tg-preheat-menu {
+	display: none;
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	min-width: 150px;
+	background: #23262e;
+	border: 1px solid rgba(255, 255, 255, .12);
+	border-radius: 8px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+	overflow: hidden;
+	z-index: 20;
+}
+.tg-preheat-menu.tg-open { display: block; }
+.tg-preheat-item {
+	padding: 8px 12px;
+	font-size: 13px;
+	color: var(--tile-dynamic-text-color);
+	cursor: pointer;
+	display: flex; align-items: center; justify-content: space-between; gap: 10px;
+	white-space: nowrap;
+}
+.tg-preheat-item:hover { background: rgba(255, 122, 60, .14); }
+.tg-preheat-item-sub { font-size: 11px; color: var(--text-color); }
+
+.tg-toggle-chart {
+	display: flex; align-items: center; gap: 6px;
+	font-size: 12px; color: var(--text-color);
+	cursor: pointer; padding: 5px 9px; border-radius: 6px;
+	white-space: nowrap;
+	margin-left: auto; /* push to the right edge of the controls row */
+}
+.tg-toggle-chart:hover { background: rgba(255, 255, 255, .07); color: var(--title-text-color); }
+
+.tg-table-wrap { overflow-x: auto; }
+
+.tg-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tg-table thead th {
+	text-align: left;
+	padding: 8px 10px;
+	color: var(--text-color);
+	font-weight: normal;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	white-space: nowrap;
+	border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+.tg-table td {
+	padding: 7px 10px;
+	color: var(--tile-dynamic-text-color);
+	white-space: nowrap;
+	border-bottom: 1px solid rgba(255, 255, 255, .04);
+}
+.tg-table tr:last-child td { border-bottom: none; }
+
+.tg-elem { display: flex; align-items: center; gap: 7px; }
+.tg-icon { font-size: 1em; }
+.tg-change { color: var(--text-color); }
+.tg-current { font-variant-numeric: tabular-nums; }
+
+/* столбец "Мощность": тонкий бар + % (классы .hp-bar/.hp-fill/.hp-val — из custom-controls.css) */
+.tg-power-wrap { display: inline-flex; align-items: center; gap: 7px; }
+
+.tg-target-cell { white-space: nowrap; }
+.tg-target-input {
+	width: 56px;
+	background: rgba(255, 255, 255, .06);
+	border: 1px solid rgba(255, 255, 255, .12);
+	border-radius: 5px;
+	color: var(--tile-dynamic-text-color);
+	padding: 3px 6px;
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+	-moz-appearance: textfield;
+}
+.tg-target-input::-webkit-outer-spin-button,
+.tg-target-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.tg-target-input:focus { outline: none; border-color: #49a7ff; background: rgba(73, 167, 255, .1); }
+.tg-target-cell sup { color: var(--text-color); margin-left: 3px; }
+.tg-no-target { color: var(--text-color); }
+
+/* Значения у точек пересечения курсора с линиями (temp-graph.js: cursorValuesPlugin).
+   Цвет задаётся из скрипта — по цвету своей линии, позиция тоже (transform), здесь только
+   оформление. pointer-events отключены, иначе подписи перехватывали бы курсор у самого
+   графика и наведение начинало дёргаться. Тёмная подложка — чтобы цифры читались поверх линий. */
+.tg-point-val {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 10;
+	pointer-events: none;
+	padding: 1px 5px;
+	border-radius: 4px;
+	background: rgba(18, 18, 20, .88);
+	font-size: 11px;
+	font-weight: bold;
+	line-height: 1.4;
+	white-space: nowrap;
+}
+.tg-point-val[hidden] { display: none; }
+
+.tg-chart-wrap { padding: 10px 12px 12px; }
+.tg-chart-wrap.tg-hidden { display: none; }
+.tg-chart { width: 100%; }
+
+/* uPlot theme fit: transparent background, our fonts */
+.tg-chart .uplot { font-family: inherit; }
+.tg-chart .u-legend { display: none; }
+
+/* --- responsive: narrower columns / stacked hints down to mobile widths --- */
+@media (max-width: 560px) {
+	.tg-table { font-size: 12px; }
+	.tg-table thead th, .tg-table td { padding: 6px 6px; }
+	.tg-col-change, .tg-change { display: none; }  /* least essential column on tiny screens */
+	.tg-elem-label { max-width: 78px; overflow: hidden; text-overflow: ellipsis; }
+	.tg-target-input { width: 46px; font-size: 12px; }
+	.tg-toggle-label { display: none; }             /* icon-only toggle button on mobile */
+	.tg-toggle-chart { padding: 4px 6px; }
+	.tg-hdr-btn-label { display: none; }            /* icon-only Preheat/Cooldown buttons on mobile */
+	.tg-hdr-btn { padding: 6px 8px; }
+	.tg-preheat-menu { min-width: 130px; max-width: calc(100vw - 40px); }
+}
+
+@media (max-width: 380px) {
+	.tg-col-power, .tg-power { display: none; }     /* drop one more column on very narrow phones */
+}

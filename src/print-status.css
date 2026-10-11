@@ -1,0 +1,170 @@
+/* print-status.css — экспериментальная карточка "3D Print Status" (dev, черновик v2).
+ * Типографика/цвета согласованы с temp-graph.css ("Температуры" — эталон, её не трогаем):
+ *  - подписи (labels): 11px, normal, uppercase, letter-spacing .04em, var(--text-color) — серый
+ *  - заголовок карточки: bold, БЕЗ явного font-size (наследует от .tile, как .tg-title)
+ *  - значения (цифры): приглушённый тон --ps-value (не чистый белый var(--title-text-color)) */
+
+/* штатные File Name / Print Stats / прогресс-бар визуально скрыты — их заменяет эта карточка
+   (File Name и Print Stats остаются в DOM и продолжают обновляться штатным JS, просто не видны;
+   свой собственный прогресс-бар/% карточка считает сама из display_status.progress) */
+.ps-superseded { display: none !important; }
+.progress-bar { display: none !important; }
+.section-time { display: none !important; } /* штатная полная дата-строка — вместо неё часы поверх камеры */
+
+/* Часы поверх изображения с камеры (M/D HH:MM, без секунд) */
+div.cam { position: relative; }
+.cam-clock {
+	position: absolute;
+	right: 8px; bottom: 8px;
+	padding: 3px 7px;
+	border-radius: 5px;
+	background: rgba(0, 0, 0, .55);
+	color: rgba(255, 255, 255, .78);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: .02em;
+	pointer-events: none;
+	z-index: 2;
+}
+
+/* .ps-row — обёртка-flex для ДВУХ отдельных карточек (.ps-card + .info-right, каждая со своим
+   фоном/бордером/скруглениями). Отступ между ними и одинаковая высота — чистый CSS
+   (align-items:stretch по умолчанию), без JS. */
+.ps-row { display: flex; gap: 16px; align-items: stretch; margin-top: 10px; }
+.ps-card {
+	--ps-value: rgba(255, 255, 255, .72); /* тон для цифр — приглушённее var(--title-text-color) */
+	flex: 1;
+	min-width: 0;
+	background: rgba(255, 255, 255, .025);
+	border: 1px solid rgba(255, 255, 255, .07);
+	border-radius: 10px;
+	overflow: hidden;
+	text-align: left;
+}
+
+@media (max-width: 860px) {
+	.ps-row { flex-direction: column; } /* Fans уходит вторым рядом под статус, не сбоку */
+}
+
+.ps-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px;                 /* = .tg-header */
+	background: rgba(255, 255, 255, .04);
+	border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+.ps-header-icon { color: var(--link-color); font-size: 1.1em; }
+.ps-title {
+	font-weight: bold;                  /* = .tg-title (не 800) */
+	color: var(--title-text-color);     /* без явного font-size — наследует, как .tg-title */
+	flex: 1;
+}
+
+.ps-status { display: flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: .04em; }
+.ps-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lowlight-color); flex: 0 0 auto; }
+.ps-status-text { color: var(--text-color); text-transform: uppercase; } /* текст всегда серый — цвет несёт только точка */
+/* Горящая точка = усиленное свечение (глубже blur + лёгкий spread); погашенная (standby) — без свечения. */
+.ps-s-printing .ps-status-dot { background: #66bb6a; box-shadow: 0 0 8px 1px rgba(102, 187, 106, .75); }
+.ps-s-paused .ps-status-dot { background: #ffb300; box-shadow: 0 0 8px 1px rgba(255, 179, 0, .7); }
+.ps-s-complete .ps-status-dot { background: #29b6f6; box-shadow: 0 0 8px 1px rgba(41, 182, 246, .7); }
+.ps-s-error .ps-status-dot,
+.ps-s-cancelled .ps-status-dot { background: #ef5350; box-shadow: 0 0 8px 1px rgba(239, 83, 80, .7); }
+.ps-s-standby .ps-status-dot { background: var(--lowlight-color); }
+
+.ps-body { padding: 11px 12px 10px; }
+.ps-label {
+	font-size: 11px;                    /* = .tg-table thead th */
+	font-weight: normal;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	color: var(--text-color);
+}
+
+/* Строка прогресса: подпись слева, процент справа. Оставшееся время раньше жило тут мелким
+   текстом (11px) и терялось на фоне плиток — теперь это полноценная плитка REMAINING TIME
+   в ps-stats-row (см. ниже), заметная наравне с остальными. */
+.ps-progress-row { margin-bottom: 10px; }
+.ps-progress-header {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	align-items: baseline;
+	gap: 10px;
+	margin-bottom: 7px;
+}
+.ps-progress-header > .ps-label { text-align: left; }
+.ps-progress-pct { font-size: 12px; font-weight: 600; color: var(--ps-value); text-align: right; font-variant-numeric: tabular-nums; }
+.ps-progress-bar {
+	position: relative;
+	height: 10px;
+	border-radius: 5px;
+	background: var(--progress-bar-bg-color);
+	overflow: visible;
+}
+.ps-progress-fill {
+	position: relative;
+	height: 100%;
+	width: 0%;
+	border-radius: 5px;
+	background: var(--link-color);
+	transition: width .4s ease;
+}
+.ps-progress-fill::after {
+	content: "";
+	position: absolute;
+	right: -1px; top: 50%;
+	width: 14px; height: 14px;
+	background: #fff;
+	border-radius: 50%;
+	transform: translate(50%, -50%);
+	box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
+	display: block;
+}
+
+.ps-stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ps-stat {
+	background: rgba(255, 255, 255, .035);
+	border: 1px solid rgba(255, 255, 255, .06);
+	border-radius: 8px;
+	padding: 8px 8px 9px;
+	text-align: center;                 /* значение центрируется относительно плитки */
+}
+.ps-stat-clickable { cursor: pointer; -webkit-user-select: none; user-select: none; }
+.ps-stat-clickable:hover { background: rgba(255, 255, 255, .06); }
+.ps-stat-head { display: flex; align-items: center; justify-content: center; gap: 5px; margin-bottom: 6px; }
+.ps-stat-head i { color: var(--link-color); font-size: .8em; }
+.ps-stat-value {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--ps-value);
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+/* formatTime() штатно оборачивает каждое число в <span class="dynamic-value"> со своим
+   цветом (var(--tile-dynamic-text-color), ярче/белее); переопределяем его тут же тоном
+   значений этой карточки, чтобы цифры и разделители "m"/"s"/"d"/"h" были одного цвета/веса. */
+.ps-card .dynamic-value { color: inherit; font-weight: inherit; }
+
+.ps-footer {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 10px;
+	padding: 9px 12px;
+	border-top: 1px solid rgba(255, 255, 255, .06);
+	font-size: 12px;
+}
+.ps-filename { color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-footer-right { flex: 0 0 auto; display: flex; align-items: center; gap: 14px; }
+.ps-eta { color: var(--text-color); white-space: nowrap; letter-spacing: .02em; } /* "ETA" — тем же шрифтом, что имя файла */
+.ps-eta-value { color: var(--ps-value); font-weight: 600; font-variant-numeric: tabular-nums; }
+.ps-zoffset { display: inline-flex; align-items: center; gap: 5px; color: var(--ps-value); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ps-zoffset i { color: var(--link-color); font-size: .9em; }
+
+/* --- адаптив вниз до мобильных --- */
+@media (max-width: 560px) {
+	.ps-progress-header { gap: 6px; }
+	.ps-stats-row { grid-template-columns: 1fr 1fr; } /* 4 плитки — ровно 2×2, без спец-случая для последней */
+	.ps-stat-value { font-size: 13px; }
+	.ps-footer { flex-wrap: wrap; }
+}

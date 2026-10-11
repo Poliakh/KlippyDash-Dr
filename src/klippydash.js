@@ -1,12 +1,13 @@
 /*
 KlippyDash
-https://github.com/nixkor/KlippyDash 
+https://github.com/nixkor/KlippyDash
 */
 var _ajaxTimeout = 10 * 1000;
 var _printers;
 var _printerState = new Array();
 var _refreshInterval = 1000;
 var _refreshTimer;
+var settings = { printers: [] }; // populated by fetch("settings.json") before setup() runs (see bottom of file)
 
 const PrintStatsState = {
 	Printing: "printing",
@@ -42,11 +43,52 @@ const Sounds = {
 	Success:"audio/success.mp3",
 }
 
-function updatePrinterObjects(index, data) { 
+//--- vanilla replacement for $.ajax ---
+//Mimics jQuery's $.ajax({url,type,contentType,timeout,success,error}) shape closely enough for this
+//codebase: success/error callbacks fire the same way, and a non-2xx HTTP response is routed to the
+//error callback (NOT a resolved success) just like jQuery does. Returns a Promise that resolves on
+//success and rejects on error/timeout, so existing Promise.allSettled(...) usage keeps working.
+function ajaxRequest(opts) {
+	var controller = new AbortController();
+	var timedOut = false;
+	var timer = opts.timeout ? setTimeout(function() { timedOut = true; controller.abort(); }, opts.timeout) : null;
+
+	var fetchOpts = { method: opts.type || 'GET', signal: controller.signal };
+	if (opts.contentType) fetchOpts.headers = { 'Content-Type': opts.contentType };
+
+	return fetch(opts.url, fetchOpts).then(function(response) {
+		if (timer) clearTimeout(timer);
+		if (!response.ok) {
+			var err = { status: response.status, statusText: response.statusText };
+			if (opts.error) opts.error(err);
+			return Promise.reject(err);
+		}
+		return response.text().then(function(text) {
+			var data;
+			try { data = text ? JSON.parse(text) : undefined; } catch (e) { data = undefined; }
+			if (opts.success) opts.success(data);
+			return data;
+		});
+	}).catch(function(err) {
+		if (timer) clearTimeout(timer);
+		if (err && typeof err.status !== "undefined") throw err; //already routed to opts.error above
+		var errObj = timedOut ? { status: 0, statusText: "timeout" } : { status: 0, statusText: (err && err.message) || "error" };
+		if (opts.error) opts.error(errObj);
+		throw errObj;
+	});
+}
+
+//HTML-escape for values interpolated into innerHTML template strings below (tile host/name come
+//from settings.js, but escape anyway to keep the markup well-formed regardless of content).
+function escHtml(s) {
+	return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function updatePrinterObjects(index, data) {
 	var currentState = _printerState[index];
 
 	if(typeof(currentState) == "undefined")
-		_printerState[index] = {};	
+		_printerState[index] = {};
 
 	//check if status flipped from printing to complete.  If so play success sound.
 	if(typeof(currentState) !== "undefined" && typeof(currentState.objects) !== "undefined") {
@@ -57,7 +99,7 @@ function updatePrinterObjects(index, data) {
 			playAudio(Sounds.Success);
 		}
 	}
-	
+
 	_printerState[index].objects = data;
 	processState(index);
 }
@@ -88,12 +130,12 @@ function updateServerInfo(index, data) {
 function getPrinterObjects(printer, index) {
 	var endpoint = "/printer/objects/query?gcode_move&toolhead&extruder=temperature,target,power&heater_bed&print_stats&display_status&bed_mesh=mesh_min,mesh_max,probed_matrix";
 
-	return $.ajax({
+	return ajaxRequest({
 		url: printer.host + endpoint,
 		type: 'GET',
 		contentType: 'application/json',
 		timeout: _ajaxTimeout,
-		success:function(data) 
+		success:function(data)
 		{
 			updatePrinterObjects(index, data.result);
 		},
@@ -108,13 +150,13 @@ function getPrinterObjects(printer, index) {
 function getPrinterInfo(printer, index) {
 	var endpoint = "/printer/info";
 
-	return $.ajax({
+	return ajaxRequest({
 		url: printer.host + endpoint,
 		type: 'GET',
 		contentType: 'application/json',
 		timeout: _ajaxTimeout,
-		success:function(data) 
-		{ 
+		success:function(data)
+		{
 			updatePrinterInfo(index, data.result);
 		},
 		error:function(err)
@@ -125,18 +167,18 @@ function getPrinterInfo(printer, index) {
 	});
 }
 
-function getServerInfo(printer, index) { 
+function getServerInfo(printer, index) {
 	var endpoint = "/server/info";
 
-	return $.ajax({
+	return ajaxRequest({
 		url: printer.host + endpoint,
 		type: 'GET',
 		contentType: 'application/json',
 		timeout: _ajaxTimeout,
-		success: function(data) { 
+		success: function(data) {
 			updateServerInfo(index, data.result);
 		},
-		error: function(err) { 
+		error: function(err) {
 			showError(index, `Error connecting to ${printer.name}`,false);
 			setProgressBar(index, 1, PrintStatsState.Error)
 		}
@@ -145,7 +187,7 @@ function getServerInfo(printer, index) {
 
 function processState(index) {
 	//sanity check all data is populated
-	if(typeof(_printerState[index]) === "undefined" 
+	if(typeof(_printerState[index]) === "undefined"
 		|| typeof(_printerState[index].objects) === "undefined"
 		|| typeof(_printerState[index].printer) === "undefined"
 		|| typeof(_printerState[index].server) === "undefined")
@@ -155,161 +197,161 @@ function processState(index) {
 	var printer = _printerState[index].printer;
 	var objects = _printerState[index].objects.status;
 
-		
+
 	//process data
-	$(`#tile${index}>.section-time`).text(Date().toString());
+	document.querySelector(`#tile${index}>.section-time`).textContent = Date().toString();
 
 	clearErrors(index);
 	setControls(index,"idle");
-	
+
 	//check connections and show warnings / errors
 	if(!server.klippy_connected) {
 		showError(index, "Klippy not connected!");
 		setProgressBar(index, 1, PrintStatsState.Error);
 		return;
 	}
-	
+
 	if(printer.state == 'error' || printer.state == 'shutdown') {   //!= "ready"
 		showError(index, printer.state_message);
 		setProgressBar(index, 1, PrintStatsState.Error);
 		return;
 	}
-	
+
 	if(server.klippy_state != 'ready') {
 		showError(index, "Klippy State:" + server.klippy_state);
 	}
 
 	setProgressBar(index, objects.display_status.progress, objects.print_stats.state);
-	
+
 	//extruder temps
-	var divExtruder =  $(`#tile${index}>.section-extruder`);
+	var divExtruder = document.querySelector(`#tile${index}>.section-extruder`);
 	if(objects.extruder.target > 0 || objects.extruder.temperature > 30 || objects.gcode_move.extrude_factor != 1.0 || objects.gcode_move.speed_factor != 1.0) {
-		divExtruder.find(".extruder-temp").text(objects.extruder.temperature.toFixed(1));
-		divExtruder.find(".extruder-target").text(objects.extruder.target);
-		divExtruder.removeClass("hidden");
+		divExtruder.querySelector(".extruder-temp").textContent = objects.extruder.temperature.toFixed(1);
+		divExtruder.querySelector(".extruder-target").textContent = objects.extruder.target;
+		divExtruder.classList.remove("hidden");
 
 		//extruder flow
-		var divExtruderFlow = divExtruder.find(".section-extruder-flow");
+		var divExtruderFlow = divExtruder.querySelector(".section-extruder-flow");
 		if(objects.gcode_move.extrude_factor != 1.0) {
-			divExtruderFlow.find(".extruder-flow").text(objects.gcode_move.extrude_factor * 100);
-			divExtruderFlow.removeClass("hidden");
+			divExtruderFlow.querySelector(".extruder-flow").textContent = objects.gcode_move.extrude_factor * 100;
+			divExtruderFlow.classList.remove("hidden");
 		}
 		else {
-			divExtruderFlow.addClass("hidden");
+			divExtruderFlow.classList.add("hidden");
 		}
 
 		//speed factor
-		var divSpeedFactor = divExtruder.find(".section-speed-factor");
+		var divSpeedFactor = divExtruder.querySelector(".section-speed-factor");
 		if(objects.gcode_move.speed_factor != 1.0) {
-			divSpeedFactor.find(".speed-factor").text(objects.gcode_move.speed_factor * 100);
-			divSpeedFactor.removeClass("hidden");
+			divSpeedFactor.querySelector(".speed-factor").textContent = objects.gcode_move.speed_factor * 100;
+			divSpeedFactor.classList.remove("hidden");
 		}
 		else {
-			divSpeedFactor.addClass("hidden");
+			divSpeedFactor.classList.add("hidden");
 		}
 
 		//zoffset
-		var divZOffset = divExtruder.find(".section-z-offset");
+		var divZOffset = divExtruder.querySelector(".section-z-offset");
 		if(Math.abs(objects.gcode_move.homing_origin[2]) >= 0.001) { //prevent odd ui like +0.000 due to precision
 			var displayText = "";
 			if(objects.gcode_move.homing_origin[2]  > 0) {
 				displayText += "+";
 			}
 			displayText += objects.gcode_move.homing_origin[2].toFixed(3);
-			divZOffset.find(".z-offset").text(displayText);
-			divZOffset.removeClass("hidden");
+			divZOffset.querySelector(".z-offset").textContent = displayText;
+			divZOffset.classList.remove("hidden");
 		}
 		else {
-			divZOffset.addClass("hidden");
+			divZOffset.classList.add("hidden");
 		}
 	}
 	else {
-		divExtruder.addClass("hidden");
+		divExtruder.classList.add("hidden");
 	}
-	
+
 	//bed temps
-	var divHeaterBed = $(`#tile${index}>.section-bed`);
+	var divHeaterBed = document.querySelector(`#tile${index}>.section-bed`);
 	if(objects.heater_bed.target > 0 || objects.heater_bed.temperature > 30) {
-		divHeaterBed.find(".bed-temp").text(objects.heater_bed.temperature.toFixed(1));
-		divHeaterBed.find(".bed-target").text(objects.heater_bed.target);
-		divHeaterBed.removeClass("hidden");
+		divHeaterBed.querySelector(".bed-temp").textContent = objects.heater_bed.temperature.toFixed(1);
+		divHeaterBed.querySelector(".bed-target").textContent = objects.heater_bed.target;
+		divHeaterBed.classList.remove("hidden");
 	}
 	else {
-		divHeaterBed.addClass("hidden");
+		divHeaterBed.classList.add("hidden");
 	}
-	
+
 	//filename
-	var divFile = $(`#tile${index}>.section-file`);
+	var divFile = document.querySelector(`#tile${index}>.section-file`);
 	if(objects.print_stats.state == "printing" || objects.print_stats.state == "paused" || objects.print_stats.state =="complete" || objects.print_stats.state == "cancelled") {
-		divFile.find(".filename").text(objects.print_stats.filename);
-		divFile.removeClass("hidden");
+		divFile.querySelector(".filename").textContent = objects.print_stats.filename;
+		divFile.classList.remove("hidden");
 	}
 	else {
-		divFile.addClass("hidden");
+		divFile.classList.add("hidden");
 	}
-	
+
 	//print stats
-	var divPrintStats =$(`#tile${index}>.section-printstats`);
+	var divPrintStats = document.querySelector(`#tile${index}>.section-printstats`);
 	if(objects.print_stats.state == "printing" || objects.print_stats.state == "paused" || objects.print_stats.state == "complete") {
-			divPrintStats.find(".total-time").html(formatTime(objects.print_stats.total_duration));
-			divPrintStats.find(".print-time").html(formatTime(objects.print_stats.print_duration));
-			divPrintStats.find(".filament-used").text((objects.print_stats.filament_used/1000).toFixed(2));	
-			
+			divPrintStats.querySelector(".total-time").innerHTML = formatTime(objects.print_stats.total_duration);
+			divPrintStats.querySelector(".print-time").innerHTML = formatTime(objects.print_stats.print_duration);
+			divPrintStats.querySelector(".filament-used").textContent = (objects.print_stats.filament_used/1000).toFixed(2);
+
 			if(objects.display_status.progress > 0 && objects.print_stats.state != "complete") { //printing or paused
 				var estimatedTotalTime = (objects.print_stats.print_duration / objects.display_status.progress);
 				var remainingTime = estimatedTotalTime - objects.print_stats.print_duration;
-				divPrintStats.find(".remaining-time").html(formatTime(remainingTime));
-				
+				divPrintStats.querySelector(".remaining-time").innerHTML = formatTime(remainingTime);
+
 				var endTime = new Date();
 				endTime = new Date(endTime.getTime() + (remainingTime * 1000));
 				if(isSameDay(endTime, new Date())) {
-					divPrintStats.find(".eta-time").text(endTime.toLocaleTimeString());
+					divPrintStats.querySelector(".eta-time").textContent = endTime.toLocaleTimeString();
 				}
 				else {
-					divPrintStats.find(".eta-time").text(endTime.toLocaleString());
+					divPrintStats.querySelector(".eta-time").textContent = endTime.toLocaleString();
 				}
-				divPrintStats.find(".complete-time").addClass("hidden"); 
+				divPrintStats.querySelector(".complete-time").classList.add("hidden");
 
-				divPrintStats.find(".printing-container").removeClass("hidden");
-				setControls(index, objects.print_stats.state);			
+				divPrintStats.querySelectorAll(".printing-container").forEach(function(el) { el.classList.remove("hidden"); });
+				setControls(index, objects.print_stats.state);
 			}
 			else if(objects.display_status.progress > 0) { //complete
-				divPrintStats.find(".printing-container").addClass("hidden");
+				divPrintStats.querySelectorAll(".printing-container").forEach(function(el) { el.classList.add("hidden"); });
 
 				//if last completed time set display offset since complete
 				if(typeof(_printerState[index].LastCompletedTime) != "undefined") {
 					var completed = _printerState[index].LastCompletedTime;
 					var current = new Date();
 					var seconds = (current.getTime() - completed.getTime()) / 1000;
-					divPrintStats.find(".complete-time").html(" +" + formatTime(seconds));
-					divPrintStats.find(".complete-time").removeClass("hidden");
+					divPrintStats.querySelector(".complete-time").innerHTML = " +" + formatTime(seconds);
+					divPrintStats.querySelector(".complete-time").classList.remove("hidden");
 				}
 				else {
-					divPrintStats.find(".complete-time").addClass("hidden");
-				}				
+					divPrintStats.querySelector(".complete-time").classList.add("hidden");
+				}
 
 				setControls(index,"complete");
 			}
 			else{ //starting up
-				divPrintStats.find(".remaining-time").html("<span class='dynamic-value'>Calculating...</span>");
-				divPrintStats.find(".eta-time").text("Calculating...");
+				divPrintStats.querySelector(".remaining-time").innerHTML = "<span class='dynamic-value'>Calculating...</span>";
+				divPrintStats.querySelector(".eta-time").textContent = "Calculating...";
 
-				divPrintStats.find(".complete-time").addClass("hidden"); 
+				divPrintStats.querySelector(".complete-time").classList.add("hidden");
 
-				divPrintStats.find(".printing-container").removeClass("hidden");
+				divPrintStats.querySelectorAll(".printing-container").forEach(function(el) { el.classList.remove("hidden"); });
 				setControls(index, "printing");
 			}
-			
-			divPrintStats.removeClass("hidden");
+
+			divPrintStats.classList.remove("hidden");
 	}
 	else if(objects.print_stats.state == "cancelled") { //cancelled
 		setControls(index, "cancelled");
 	}
 	else { //idle
-		divPrintStats.addClass("hidden");
+		divPrintStats.classList.add("hidden");
 		setControls(index, "idle");
 	}
-		
+
 	//errors
 	if(objects.print_stats.state == "error") {
 		showError(index,`Error: ${objects.print_stats.message}`);
@@ -341,12 +383,12 @@ function setControls(index, state) {
 			setControlVisibility(index,"e-stop",true);
 			setControlVisibility(index,"clear",true);
 			break;
-		case "complete":			
+		case "complete":
 			setControlVisibility(index,"resume",false);
 			setControlVisibility(index,"pause",false);
 			setControlVisibility(index,"cancel",false);
 			setControlVisibility(index,"e-stop",true);
-			setControlVisibility(index,"clear",true);		
+			setControlVisibility(index,"clear",true);
 			break;
 		case "error":
 		case "idle":
@@ -362,24 +404,26 @@ function setControls(index, state) {
 function setControlVisibility(index, name, visible) {
 	var ctrl = getTileControl(index,name);
 	if(typeof(ctrl) != "undefined" && ctrl.length>0) {
-		if(visible){
-			ctrl.removeClass("hidden");
-		}
-		else {
-			ctrl.addClass("hidden");
-		}
+		ctrl.forEach(function(el) {
+			if(visible){
+				el.classList.remove("hidden");
+			}
+			else {
+				el.classList.add("hidden");
+			}
+		});
 	}
 }
 
 function getTileControl(index, name) {
-	return $(`#tile${index}>.title-container>.control-wrap>.control-${name}`);
+	return document.querySelectorAll(`#tile${index}>.title-container>.control-wrap>.control-${name}`);
 }
 
-function formatTime(seconds, mode = "compact-html") {	
+function formatTime(seconds, mode = "compact-html") {
 	const minute = 60;
 	const hour = minute * 60;
-	const day = hour * 24; 
-	
+	const day = hour * 24;
+
 	var d = Math.floor((seconds / day));
 	seconds -= d * day;
 	var h = Math.floor((seconds / hour));
@@ -387,9 +431,9 @@ function formatTime(seconds, mode = "compact-html") {
 	var m =  Math.floor((seconds / minute));
 	seconds -= m * minute;
 	var s = Math.floor(seconds);
-	
+
 	var response = "";
-	
+
 	switch(mode) {
 		case "compact-html":
 			if (d > 0) {
@@ -398,11 +442,11 @@ function formatTime(seconds, mode = "compact-html") {
 			if (h > 0) {
 				response += `<span class="dynamic-value">${h}</span>h`;
 			}
-			if (m > 0) {		
+			if (m > 0) {
 				response += `<span class="dynamic-value">${m}</span>m`;
 			}
-			if (s > 0 || response == "") 
-				response += `<span class="dynamic-value">${s}</span>s`;			
+			if (s > 0 || response == "")
+				response += `<span class="dynamic-value">${s}</span>s`;
 			break;
 		case "basic":
 			if (d > 0) {
@@ -412,17 +456,17 @@ function formatTime(seconds, mode = "compact-html") {
 				if(h <= 9) response += "0";
 				response += `${h}:`;
 			}
-			if (m > 0) {		
+			if (m > 0) {
 				if(m <= 9) response += "0";
 				response += `${m}:`;
 			}
 			if(s <= 9) response += "0";
 			response += `${s}`;
-			
+
 			if(response.substring(0,1) == "0") { //remove leading zeros
 				response = response.substring(1);
 			}
-			break;			
+			break;
 		case "compact":
 			if (d > 0) {
 				response += `${d}d`;
@@ -432,12 +476,12 @@ function formatTime(seconds, mode = "compact-html") {
 				response += `${h}h`;
 				//if(m+s > 0) response += " ";
 			}
-			if (m > 0) {		
+			if (m > 0) {
 				response += `${m}m`;
 				//if(s > 0) response += " ";
 			}
 			if (s > 0 || response == "") response += `${s}s`;
-			break;			
+			break;
 		case "verbose":
 		default:
 			if (d > 0) {
@@ -448,45 +492,45 @@ function formatTime(seconds, mode = "compact-html") {
 				response += `${h} hours`;
 				if(m+s > 0) response += ", ";
 			}
-			if (m > 0) {		
+			if (m > 0) {
 				response += `${m} minutes`;
 				if(s > 0) response += ", ";
 			}
 			if (s > 0 || response == "") response += `${s} seconds`;
 			break;
 	}
-	
+
 	return response;
 }
 
 function showExtruder(index, enabled) {
-	var div = $(`#tile${index}>.section-extruder`);
+	var div = document.querySelector(`#tile${index}>.section-extruder`);
 	if(enabled)
-		div.removeClass("hidden");
+		div.classList.remove("hidden");
 	else
 	{
-		div.addClass("hidden");	
+		div.classList.add("hidden");
 	}
 }
 
 function clearErrors(index) {
-	var div = $(`#tile${index}>.section-error`);
-	div.addClass("hidden");
+	var div = document.querySelector(`#tile${index}>.section-error`);
+	div.classList.add("hidden");
 
 	//only remove body alert if all errors are silenced.
-	if($(".tile>.section-error").not(".hidden").length == 0 ) {
-		$("body").removeClass("alert");
+	if(document.querySelectorAll(".tile>.section-error:not(.hidden)").length == 0 ) {
+		document.body.classList.remove("alert");
 	}
 }
 
 function showError(index, message, alert = true) {
-	var div = $(`#tile${index}>.section-error`);
+	var div = document.querySelector(`#tile${index}>.section-error`);
 
-	div.html(message);
-	div.removeClass("hidden");
+	div.innerHTML = message;
+	div.classList.remove("hidden");
 
 	if(alert) {
-		$("body").addClass("alert");
+		document.body.classList.add("alert");
 	}
 }
 
@@ -505,11 +549,26 @@ function updatePrinter(printer, index) {
 	return pending;
 }
 
+//Точка входа для обоих режимов камеры: постоянная трансляция (printer.cameraStream) или штатные
+//снимки, которые updateCamera() обновляет каждый опрос.
+function setCameraSource(el, printer) {
+	var action = printer.cameraStream ? "stream" : "snapshot";
+	el.setAttribute("src", printer.host + "/webcam/?action=" + action + "&cache=" + Math.random());
+}
+
 function updateCamera(printer, index) {
-	var cam = $(`#tile${index}>div.cam>img.cam`);
-	//only update if in snapshot mode?
-	if(cam.attr("src").includes("snapshot")) {
-		cam.attr("src", printer.host + "/webcam/?action=snapshot&cache=" + Math.random());
+	var cam = document.querySelector(`#tile${index}>div.cam>img.cam`);
+	if(!cam) return;
+	var src = cam.getAttribute("src") || "";
+	if(src.includes("snapshot")) {
+		cam.setAttribute("src", printer.host + "/webcam/?action=snapshot&cache=" + Math.random());
+	}
+	else if(printer.cameraStream && cam.closest("div.cam").classList.contains("cam-offline")) {
+		//В режиме потока <img> сам не переподключается: если соединение оборвалось (принтер ушёл в
+		//перезагрузку, моргнул wifi), картинка остаётся мёртвой навсегда. В режиме снимков этого нет,
+		//там каждый опрос — новый запрос. Класс .cam-offline ставит custom-controls.js по событию
+		//error, используем его как сигнал к переподключению.
+		setCameraSource(cam, printer);
 	}
 }
 
@@ -519,7 +578,7 @@ function calculateRemainingTime(duration, progress) {
 		var estTotalTime = (duration / progress);
 		return estTotalTime - duration;
 	}
-	return undefined; 
+	return undefined;
 }
 
 //Date has no .day property (it's getDate()/getDay()), so the old endTime.day checks compared undefined==undefined.
@@ -545,7 +604,7 @@ function calculateEta(remainingTime) {
 
 function refreshTitle() {
 	var title = "";
-	if($("body").hasClass("alert"))
+	if(document.body.classList.contains("alert"))
 		title = "!!!ALERT!!!"
 	else {
 		//some printers may be only partially loaded (a /server/info response arrived but /objects/query hasn't yet),
@@ -555,7 +614,7 @@ function refreshTitle() {
 			if(title.length > 0) title += " ";
 			var p = printing.sort((a,b) =>  calculateRemainingTime(a.objects.status.print_stats.print_duration, a.objects.status.display_status.progress) - calculateRemainingTime(b.objects.status.print_stats.print_duration, b.objects.status.display_status.progress))[0];
 
-			title += `${p.objects.status.display_status.progress.toLocaleString(undefined,{style: 'percent', minimumFractionDigits:0, maximumFractionDigits:0})}; ETA: ${calculateEta(calculateRemainingTime(p.objects.status.print_stats.print_duration, p.objects.status.display_status.progress))}`;						
+			title += `${p.objects.status.display_status.progress.toLocaleString(undefined,{style: 'percent', minimumFractionDigits:0, maximumFractionDigits:0})}; ETA: ${calculateEta(calculateRemainingTime(p.objects.status.print_stats.print_duration, p.objects.status.display_status.progress))}`;
 		}
 	}
 	if(title.length > 0) title += " - ";
@@ -577,18 +636,18 @@ function updateAll() {
 
 function setProgressBar(index, percent, state, message = undefined) {
 	var statusDict = {  //trying to implement some form of typing status to remove unwanted classes - may be a better way
-		"success":{"status":"success"}, 
-		"warning": {"status":"warning"}, 
-		"error": {"status":"error"}, 
-		"party-time": {"status":"party-time"}, 
+		"success":{"status":"success"},
+		"warning": {"status":"warning"},
+		"error": {"status":"error"},
+		"party-time": {"status":"party-time"},
 		"standby": {"status":"standby"},
 		"printing":{"status":"printing"}
 	};
 	var bonusClass = undefined;
-	
+
 	switch(state) {
 		case PrintStatsState.Printing:
-			if (typeof(message) == "undefined") message = `Printing - ${percent.toLocaleString(undefined,{style: 'percent', minimumFractionDigits:0, maximumFractionDigits:0})}`;	
+			if (typeof(message) == "undefined") message = `Printing - ${percent.toLocaleString(undefined,{style: 'percent', minimumFractionDigits:0, maximumFractionDigits:0})}`;
 			bonusClass = statusDict["printing"].status;
 			break;
 		case "complete":
@@ -597,7 +656,7 @@ function setProgressBar(index, percent, state, message = undefined) {
 			percent = 1;
 			break;
 		case "paused":
-			if (typeof(message) == "undefined") message = `Paused - ${percent.toLocaleString(undefined,{style: 'percent', minimumFractionDigits:0, maximumFractionDigits:0})}`;	
+			if (typeof(message) == "undefined") message = `Paused - ${percent.toLocaleString(undefined,{style: 'percent', minimumFractionDigits:0, maximumFractionDigits:0})}`;
 			bonusClass = statusDict["warning"].status;
 			break;
 		case "error":
@@ -613,7 +672,7 @@ function setProgressBar(index, percent, state, message = undefined) {
 		case "cancelled":
 			message = "Cancelled";
 			bonusClass = statusDict["error"].status;
-			percent = 1;  
+			percent = 1;
 			break;
 		default:
 			if (typeof(message) == "undefined") message = `Unhandled State: ${state}`;
@@ -621,247 +680,140 @@ function setProgressBar(index, percent, state, message = undefined) {
 			percent = 1;
 			break;
 	}
-	var bar = $(`#tile${index}>.progress-bar`);
-	if(message != undefined) bar.find(".progress-bar-text").text(message);
-	
-	
+	var bar = document.querySelector(`#tile${index}>.progress-bar`);
+	var barProgress = bar.querySelector(".progress-bar-progress");
+	if(message != undefined) bar.querySelector(".progress-bar-text").textContent = message;
+
+
 	//remove previous bonus class if it changed.
 	for(const key in statusDict) {
-		if(statusDict[key].status != bonusClass) 
-			bar.find(".progress-bar-progress").removeClass(statusDict[key].status);
+		if(statusDict[key].status != bonusClass)
+			barProgress.classList.remove(statusDict[key].status);
 	}
-	
-	if(bonusClass != undefined) bar.find(".progress-bar-progress").addClass(bonusClass);
+
+	if(bonusClass != undefined) barProgress.classList.add(bonusClass);
 
 	if(percent > 0) {
-		bar.find(".progress-bar-progress").attr("style",`width:${percent.toLocaleString(undefined,{style: 'percent', minimumFractionDigits:0, maximumFractionDigits:0})}`).removeClass("hidden");
+		barProgress.setAttribute("style",`width:${percent.toLocaleString(undefined,{style: 'percent', minimumFractionDigits:0, maximumFractionDigits:0})}`);
+		barProgress.classList.remove("hidden");
 	}
 	else {
-		bar.find(".progress-bar-progress").attr("style",`width:${percent.toLocaleString(undefined,{style: 'percent', minimumFractionDigits:0, maximumFractionDigits:0})}`).removeClass("hidden");  //if showing bar make sure to set appropriately!
+		barProgress.setAttribute("style",`width:${percent.toLocaleString(undefined,{style: 'percent', minimumFractionDigits:0, maximumFractionDigits:0})}`);  //if showing bar make sure to set appropriately!
+		barProgress.classList.remove("hidden");
 	}
-	
+
 	//animate bar if printing
-	if(state == PrintStatsState.Printing) 
-		bar.addClass("animated");
+	if(state == PrintStatsState.Printing)
+		bar.classList.add("animated");
 	else
-		bar.removeClass("animated");
+		bar.classList.remove("animated");
 }
 
 function createTiles() {
-	var canvas = $("#klippydash");
+	var canvas = document.getElementById("klippydash");
 
 	_printers.forEach(function(val, index, arr) {
-		var data = {"index": index}; 
-	
-		//build the tiles
-		canvas
-			.append($("<div>")//tile
-				.attr("class","tile")
-				.attr("id","tile" + index)
-				.attr("data",JSON.stringify(data))
-				.append($("<div>") 
-					.attr("class","title-container")
-					.append($("<div>") //title
-						.attr("class", "title")
-						.append($("<a>")
-						.attr("href",`${val.host}/`)
-							.attr("target","_blank")
-							.html(`${val.name}`)
-						)
-					)
-					.append($("<div>")
-						.attr("class","control-wrap") 
-						.append($("<span>")
-							.attr("class","control-resume hidden")
-							.attr("title","Resume")
-							.attr("data",JSON.stringify(data))
-							.html(HtmlCode.Play)
-						)
-						.append($("<span>")
-							.attr("class","control-pause hidden")
-							.attr("title","Pause")
-							.attr("data",JSON.stringify(data))
-							.html(HtmlCode.Pause)
-						)						
-						.append($("<span>")
-							.attr("class","control-cancel hidden")
-							.attr("title","Cancel")
-							.attr("data",JSON.stringify(data))
-							.html(HtmlCode.Stop)
-						)
-						.append($("<span>")
-							.attr("class","control-clear hidden")
-							.attr("title","Clear")
-							.attr("data",JSON.stringify(data))
-							.html(HtmlCode.Refresh)
-						)																		
-						.append($("<span>")
-							.attr("class","control-e-stop hidden")
-							.attr("title","E-Stop")
-							.attr("data",JSON.stringify(data))
-							.html(HtmlCode.Octagon)
-						)
-					)
-				)
-				.append($("<div>") //camera 
-					.attr("class","cam")
-						.append($("<img>")
-							.attr("class","cam")
-							.attr("data",JSON.stringify(data))
-						)
-				)
-				.append($("<div>")
-					.attr("class","progress-bar")
-					.append($("<div>")
-						.attr("class","progress-bar-progress")
-						.attr("style","width:0%")
-						.append($("<span>")
-							.attr("id","progressbar-text").attr("class","progress-bar-text")						
-						)						
-					)
-				)				
-				.append($("<div>")
-					.attr("class","section-file tile-line hidden")
-					.append($("<span>").attr("class","label").append("File Name: "))
-					.append($("<span>")
-						.attr("class","filename dynamic-value")
-					)
-				)
-				.append($("<div>")
-					.attr("class","section-printstats hidden")
-					.append($("<div>")
-						.attr("style","display:block;")
-						.append($("<span>")
-							.attr("class","tile-line")
-							.attr("style","display:inline-block;text-align:left;width:50%")
-							.append($("<span>").attr("class","label").append("Total Time: "))
-							.append($("<span>")
-								.attr("class", "total-time")
-							)
-							.append($("<span>").attr("class", "complete-time"))
-						)
-						.append($("<span>")
-							.attr("class","printing-container tile-line")
-							.attr("style","display:inline-block;text-align:left;width:50%")
-							.append($("<span>").attr("class","label").append("Remaining Time: "))
-							.append($("<span>")
-								.attr("class", "remaining-time")
-							)
-						)	
-					)
-					.append($("<div>")
-						.attr("style","display:block;")					
-						.append($("<span>")
-							.attr("class","tile-line")
-							.attr("style","display:inline-block;text-align:left;width:50%")
-							.append($("<span>").attr("class","label").append("Print Time: "))
-							.append($("<span>")
-								.attr("class", "print-time")
-							)
-						)						
-						.append($("<span>")
-							.attr("class","printing-container tile-line")
-							.attr("style","display:inline-block;text-align:left;width:50%")
-							.append($("<span>").attr("class","label").append("ETA: "))
-							.append($("<span>")
-								.attr("class", "eta-time dynamic-value")
-							)
-						)							
-					)					
-					.append($("<div>")
-						.attr("class","tile-line")					
-						.attr("style","display:block;")
-						.append($("<span>").attr("class","label").append("Filament Used: "))
-						.append($("<span>")
-							.attr("class", "filament-used dynamic-value")
-						)
-						.append("m")
-					)					
-				)
-				.append($("<div>")
-					.attr("class","section-extruder tile-line hidden")
-					.append($("<span>").attr("class","label").append("Extruder: "))
-					.append($("<span>")
-						.attr("class","extruder-temp dynamic-value")
-					)
-					.append(" / ")
-					.append($("<span>")
-						.attr("class","extruder-target dynamic-value")
-					)
-					.append($("<sup>").html(HtmlCode.Celsius))
-					.append($("<span>")
-						.attr("class","section-extruder-flow")
-						.attr("title","Flow")
-						.append($("<span>").attr("class","label").append(showSvgIcon(SvgIcon.Flow)))
-						.append($("<span>")
-							.attr("class","extruder-flow dynamic-value")
-						)
-						.append("%")
-					)
-					.append($("<span>")
-						.attr("class","section-speed-factor")
-						.attr("title","Speed Factor")
-						.append($("<span>").attr("class","label").append(showSvgIcon(SvgIcon.Speed)))
-						.append($("<span>")
-							.attr("class","speed-factor dynamic-value")
-						)
-						.append("%")
-					)
-					.append($("<span>")
-						.attr("class","section-z-offset")
-						.attr("title","Z-Offset")
-						.append($("<span>").attr("class","label").append(showSvgIcon(SvgIcon.Offset)))
-						.append($("<span>")
-							.attr("class","z-offset dynamic-value")
-						)
-						.append("mm")
-					)					
-				)
-				.append($("<div>")
-					.attr("class","section-bed tile-line hidden")
-					.append($("<span>").attr("class","label").append("Bed: "))
-					.append($("<span>")
-						.attr("class","bed-temp dynamic-value")
-					)
-					.append(" / ")
-					.append($("<span>")
-						.attr("class","bed-target dynamic-value")
-					)
-					.append($("<sup>").html(HtmlCode.Celsius))
-				)		
-				.append($("<div>") //error
-						.attr("class","section-error hidden")
-				)				
-				.append($("<div>")
-					.attr("class","section-time tiny" )
-				)
-			)
+		var data = {"index": index};
+		var dataAttr = escHtml(JSON.stringify(data));
+
+		//build the tile
+		var tileHtml =
+			`<div class="tile" id="tile${index}" data="${dataAttr}">` +
+				`<div class="title-container">` +
+					`<div class="title"><a href="${escHtml(val.host)}/" target="_blank">${escHtml(val.name)}</a></div>` +
+					`<div class="control-wrap">` +
+						`<span class="control-resume hidden" title="Resume" data="${dataAttr}">${HtmlCode.Play}</span>` +
+						`<span class="control-pause hidden" title="Pause" data="${dataAttr}">${HtmlCode.Pause}</span>` +
+						`<span class="control-cancel hidden" title="Cancel" data="${dataAttr}">${HtmlCode.Stop}</span>` +
+						`<span class="control-clear hidden" title="Clear" data="${dataAttr}">${HtmlCode.Refresh}</span>` +
+						`<span class="control-e-stop hidden" title="E-Stop" data="${dataAttr}">${HtmlCode.Octagon}</span>` +
+					`</div>` +
+				`</div>` +
+				`<div class="cam"><img class="cam" data="${dataAttr}" /></div>` +
+				`<div class="progress-bar">` +
+					`<div class="progress-bar-progress" style="width:0%">` +
+						`<span id="progressbar-text" class="progress-bar-text"></span>` +
+					`</div>` +
+				`</div>` +
+				`<div class="section-file tile-line hidden">` +
+					`<span class="label">File Name: </span>` +
+					`<span class="filename dynamic-value"></span>` +
+				`</div>` +
+				`<div class="section-printstats hidden">` +
+					`<div style="display:block;">` +
+						`<span class="tile-line" style="display:inline-block;text-align:left;width:50%">` +
+							`<span class="label">Total Time: </span>` +
+							`<span class="total-time"></span>` +
+							`<span class="complete-time"></span>` +
+						`</span>` +
+						`<span class="printing-container tile-line" style="display:inline-block;text-align:left;width:50%">` +
+							`<span class="label">Remaining Time: </span>` +
+							`<span class="remaining-time"></span>` +
+						`</span>` +
+					`</div>` +
+					`<div style="display:block;">` +
+						`<span class="tile-line" style="display:inline-block;text-align:left;width:50%">` +
+							`<span class="label">Print Time: </span>` +
+							`<span class="print-time"></span>` +
+						`</span>` +
+						`<span class="printing-container tile-line" style="display:inline-block;text-align:left;width:50%">` +
+							`<span class="label">ETA: </span>` +
+							`<span class="eta-time dynamic-value"></span>` +
+						`</span>` +
+					`</div>` +
+					`<div class="tile-line" style="display:block;">` +
+						`<span class="label">Filament Used: </span>` +
+						`<span class="filament-used dynamic-value"></span>m` +
+					`</div>` +
+				`</div>` +
+				`<div class="section-extruder tile-line hidden">` +
+					`<span class="label">Extruder: </span>` +
+					`<span class="extruder-temp dynamic-value"></span> / <span class="extruder-target dynamic-value"></span>` +
+					`<sup>${HtmlCode.Celsius}</sup>` +
+					`<span class="section-extruder-flow" title="Flow">` +
+						`<span class="label">${showSvgIcon(SvgIcon.Flow)}</span>` +
+						`<span class="extruder-flow dynamic-value"></span>%` +
+					`</span>` +
+					`<span class="section-speed-factor" title="Speed Factor">` +
+						`<span class="label">${showSvgIcon(SvgIcon.Speed)}</span>` +
+						`<span class="speed-factor dynamic-value"></span>%` +
+					`</span>` +
+					`<span class="section-z-offset" title="Z-Offset">` +
+						`<span class="label">${showSvgIcon(SvgIcon.Offset)}</span>` +
+						`<span class="z-offset dynamic-value"></span>mm` +
+					`</span>` +
+				`</div>` +
+				`<div class="section-bed tile-line hidden">` +
+					`<span class="label">Bed: </span>` +
+					`<span class="bed-temp dynamic-value"></span> / <span class="bed-target dynamic-value"></span>` +
+					`<sup>${HtmlCode.Celsius}</sup>` +
+				`</div>` +
+				`<div class="section-error hidden"></div>` +
+				`<div class="section-time tiny"></div>` +
+			`</div>`;
+
+		canvas.insertAdjacentHTML("beforeend", tileHtml);
 	});
 
 	//add confirmation dialog (native <dialog> element)
-	canvas.append($("<dialog>")
-		.attr("id","confirmation-dialog")
-		.append($("<div>")
-			.attr("class","dialog-title")
-			.append($("<span>").attr("class","title-text").append("Are you sure?"))
-		)
-		.append($("<div>")
-			.attr("class","dialog-content")
-			.append($("<span>").attr("class","message"))
-		)
-		.append($("<div>")
-			.attr("class","dialog-buttons")
-			.append($("<button>").attr("type","button").attr("class","dialog-no").append("No"))
-			.append($("<button>").attr("type","button").attr("class","dialog-yes").append("Yes"))
-		)
-	);
+	var dialogHtml =
+		`<dialog id="confirmation-dialog">` +
+			`<div class="dialog-title"><span class="title-text">Are you sure?</span></div>` +
+			`<div class="dialog-content"><span class="message"></span></div>` +
+			`<div class="dialog-buttons">` +
+				`<button type="button" class="dialog-no">No</button>` +
+				`<button type="button" class="dialog-yes">Yes</button>` +
+			`</div>` +
+		`</dialog>`;
+	canvas.insertAdjacentHTML("beforeend", dialogHtml);
 
 	//add footer
-	canvas.append($("<div>").attr("class","footer").html("<a href='https://github.com/nixkor/KlippyDash'>KlippyDash</a> - a lightweight Klipper dashboard."));
+	var footerHtml = `<div class="footer"><a href='https://github.com/nixkor/KlippyDash'>KlippyDash</a> - a lightweight Klipper dashboard.</div>`;
+	canvas.insertAdjacentHTML("beforeend", footerHtml);
 }
 
 function showSvgIcon(icon) {
-	htmlCode = "";
+	var htmlCode = "";
 	if(icon.length > 0) {
 		htmlCode = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="true" class="icon-svg" style=""><path d="${icon}"></path></svg>`;
 	}
@@ -885,12 +837,12 @@ function filterPrinters(dictQueryString) {
 		}
 
 		var filteredPrinters = new Array();
-		queryStringArray.forEach(function (val, index, arr) {  
+		queryStringArray.forEach(function (val, index, arr) {
 			if (Number.parseInt(val) >= 0
 				&& Number.parseInt(val) < allPrinters.length) { //do some sanity checking on string value
 				filteredPrinters.push(allPrinters[Number.parseInt(val)]);
 			}
-		});			
+		});
 		return filteredPrinters;
 	}
 	else {
@@ -901,7 +853,7 @@ function filterPrinters(dictQueryString) {
 function parseQueryString() {
 	var dict = {};
 	if(location.search.length > 1) {
-			var queryString = location.search.substring(1); //remove the ? 
+			var queryString = location.search.substring(1); //remove the ?
 			var pairs = queryString.split("&"); // split querystring on ampersand into kv pairs
 			pairs.forEach(function(pair, index, arr) {
 				var kvp = pair.split("=");  //split pair on equals into parts
@@ -914,19 +866,20 @@ function parseQueryString() {
 				dict[key] = value;
 			});
 	}
-	
+
 	return dict;
 }
 
 function showConfirmation(title, htmlMessage, endpoint) {
 	var dialog = document.getElementById("confirmation-dialog");
 
-	$(dialog).find(".title-text").text(title);
-	$(dialog).find(".message").html(htmlMessage);
+	dialog.querySelector(".title-text").textContent = title;
+	dialog.querySelector(".message").innerHTML = htmlMessage;
 
 	//rebind handlers each time so we don't stack listeners or fire a stale endpoint
-	$(dialog).find(".dialog-yes").off("click").on("click", function() {
-		$.ajax({
+	//(assigning to .onclick replaces any previously-assigned handler, same effect as jQuery's .off().on())
+	dialog.querySelector(".dialog-yes").onclick = function() {
+		ajaxRequest({
 			url: endpoint,
 			type: 'POST',
 			contentType: 'application/json',
@@ -936,11 +889,11 @@ function showConfirmation(title, htmlMessage, endpoint) {
 			}
 		});
 		dialog.close();
-	});
+	};
 
-	$(dialog).find(".dialog-no").off("click").on("click", function() {
+	dialog.querySelector(".dialog-no").onclick = function() {
 		dialog.close();
-	});
+	};
 
 	dialog.showModal();
 }
@@ -960,17 +913,17 @@ function setup() {
 
 	createTiles();
 
-	//bind jquery handlers
+	//bind handlers
 	bindHandlers();
 
 	//set full screen if passed
 	if("fullscreen" in dictQueryString && JSON.parse(dictQueryString["fullscreen"])) {
-		$("body").addClass("full-screen");
+		document.body.classList.add("full-screen");
 	}
 
 	//set theme if passed in querystring
 	var theme = settings.theme;
-	if("theme" in dictQueryString) 
+	if("theme" in dictQueryString)
 		theme = dictQueryString["theme"];
 	document.documentElement.setAttribute("data-theme",theme);
 
@@ -991,21 +944,43 @@ var party = {
 	On: function(seconds = 30) {
 		if(this._timer !== undefined) {
 			party.Off(); //turn off the previous party!
-		}	
-		$("body").addClass("party-time");		
+		}
+		document.body.classList.add("party-time");
 		this._timer = setTimeout(() => { party.Off(); }, seconds * 1000);
 	},
 	Off: function() {
 		clearInterval(this._timer);
-		$("body").removeClass("party-time");
+		document.body.classList.remove("party-time");
 		this._timer = undefined;
 	},
 	AreWePartying: function() { return (this._timer !== undefined); }
-} 
+}
 
-$(() => {
-	setup();
-	updateAll().then(scheduleNextUpdate);
+function ready(fn) {
+	if(document.readyState !== "loading") fn();
+	else document.addEventListener("DOMContentLoaded", fn);
+}
+
+// Настройки теперь приходят из settings.json (не из синхронно загруженного settings.js) —
+// нужно дождаться fetch() перед setup()/createTiles(). Наши add-on модули (custom-controls.js,
+// print-status.js, temp-graph.js) раньше стартовали по DOMContentLoaded одновременно со стоковым
+// кодом (порядок <script> гарантировал, что плитки уже созданы к их моменту); теперь это больше
+// не гарантировано (fetch асинхронный), поэтому по завершении шлём отдельное событие
+// "klippydash:ready", на которое они подписываются вместо DOMContentLoaded.
+ready(() => {
+	fetch("settings.json")
+		.then(function (r) { return r.json(); })
+		.then(function (data) {
+			settings = data;
+			setup();
+			updateAll().then(scheduleNextUpdate);
+			window.dispatchEvent(new CustomEvent("klippydash:ready"));
+		})
+		.catch(function (err) {
+			console.error("KlippyDash: failed to load settings.json", err);
+			document.getElementById("klippydash").textContent =
+				"Failed to load settings.json: " + err;
+		});
 });
 
 function playAudio(sound) {
@@ -1022,124 +997,142 @@ function playAudio(sound) {
 }
 
 function bindHandlers() {
-	$(".control-e-stop").click(function(e) {
-		var data = JSON.parse($(this).closest(".tile").attr("data"));
-		var printer = _printers[data.index];
+	document.querySelectorAll(".control-e-stop").forEach(function(el) {
+		el.addEventListener("click", function(e) {
+			var data = JSON.parse(this.closest(".tile").getAttribute("data"));
+			var printer = _printers[data.index];
 
-		showConfirmation("Emergency Stop?",
-			`Are you sure you want to emergency stop?<br/><br />Printer: ${printer.name}`,
-			`${printer.host}/printer/emergency_stop`
-		);
+			showConfirmation("Emergency Stop?",
+				`Are you sure you want to emergency stop?<br/><br />Printer: ${printer.name}`,
+				`${printer.host}/printer/emergency_stop`
+			);
+		});
 	});
 
-	$(".control-pause").click(function(e) {
-		var data = JSON.parse($(this).closest(".tile").attr("data"));
-		var printer = _printers[data.index];
+	document.querySelectorAll(".control-pause").forEach(function(el) {
+		el.addEventListener("click", function(e) {
+			var data = JSON.parse(this.closest(".tile").getAttribute("data"));
+			var printer = _printers[data.index];
 
-		showConfirmation("Pause Print?",
-			`Are you sure you want to pause?<br/><br />Printer: ${printer.name}`,
-			`${printer.host}/printer/print/pause`
-		);
+			showConfirmation("Pause Print?",
+				`Are you sure you want to pause?<br/><br />Printer: ${printer.name}`,
+				`${printer.host}/printer/print/pause`
+			);
+		});
 	});
 
-	$(".control-resume").click(function(e) {
-		var data = JSON.parse($(this).closest(".tile").attr("data"));
-		var printer = _printers[data.index];
+	document.querySelectorAll(".control-resume").forEach(function(el) {
+		el.addEventListener("click", function(e) {
+			var data = JSON.parse(this.closest(".tile").getAttribute("data"));
+			var printer = _printers[data.index];
 
-		showConfirmation("Resume?",
-			`Are you sure you want to resume?<br/><br />Printer: ${printer.name}`,
-			`${printer.host}/printer/print/resume`
-		);
+			showConfirmation("Resume?",
+				`Are you sure you want to resume?<br/><br />Printer: ${printer.name}`,
+				`${printer.host}/printer/print/resume`
+			);
+		});
 	});
 
-	$(".control-cancel").click(function(e) {
-		var data = JSON.parse($(this).closest(".tile").attr("data"));
-		var printer = _printers[data.index];
+	document.querySelectorAll(".control-cancel").forEach(function(el) {
+		el.addEventListener("click", function(e) {
+			var data = JSON.parse(this.closest(".tile").getAttribute("data"));
+			var printer = _printers[data.index];
 
-		showConfirmation("Cancel?",
-			`Are you sure you want to cancel?<br/><br />Printer: ${printer.name}`,
-			`${printer.host}/printer/print/cancel`
-		);
+			showConfirmation("Cancel?",
+				`Are you sure you want to cancel?<br/><br />Printer: ${printer.name}`,
+				`${printer.host}/printer/print/cancel`
+			);
+		});
 	});
 
-	$(".control-clear").click(function(e) {
-		var data = JSON.parse($(this).closest(".tile").attr("data"));
-		var printer = _printers[data.index];
+	document.querySelectorAll(".control-clear").forEach(function(el) {
+		el.addEventListener("click", function(e) {
+			var data = JSON.parse(this.closest(".tile").getAttribute("data"));
+			var printer = _printers[data.index];
 
-		var endpoint = "/printer/gcode/script?script=SDCARD_RESET_FILE";
-		$.ajax({
-			url: printer.host + endpoint,
-			type: 'POST',
-			contentType: 'application/json',
-			timeout: _ajaxTimeout,
+			var endpoint = "/printer/gcode/script?script=SDCARD_RESET_FILE";
+			ajaxRequest({
+				url: printer.host + endpoint,
+				type: 'POST',
+				contentType: 'application/json',
+				timeout: _ajaxTimeout,
 
-			error: function(err) {
-				alert(`failure! ${err}`);
-			}
+				error: function(err) {
+					alert(`failure! ${err}`);
+				}
+			});
 		});
 	});
 
 	//flip x/y image functionality
-	$("img.cam").each(function () {
-		var data = JSON.parse($(this).attr("data"));		
+	document.querySelectorAll("img.cam").forEach(function(el) {
+		var data = JSON.parse(el.getAttribute("data"));
 		if(_printers[data.index].flip_x) {
-			$(this).addClass("flipx")
-	
+			el.classList.add("flipx")
+
 		}
 		else {
-			$(this).removeClass("flipx")
+			el.classList.remove("flipx")
 		}
 
 		if(_printers[data.index].flip_y) {
-			$(this).addClass("flipy")
-		}		
+			el.classList.add("flipy")
+		}
 		else {
-			$(this).removeClass("flipy")
+			el.classList.remove("flipy")
 		}
 	});
 
-	//set inital to snapshot
-	$("img.cam").each(function () {
-		var data = JSON.parse($(this).attr("data"));
-		$(this).attr("src", _printers[data.index].host + "/webcam/?action=snapshot&cache=" + Math.random());
+	//начальный источник: поток или снимок, в зависимости от настройки принтера
+	document.querySelectorAll("img.cam").forEach(function(el) {
+		var data = JSON.parse(el.getAttribute("data"));
+		setCameraSource(el, _printers[data.index]);
 	});
 
-	//set hover to stream
-	$("img.cam").hover(function(e) {
-		var data = JSON.parse($(this).attr("data"));
-		$(this).attr("src", _printers[data.index].host + "/webcam/?action=stream");
-	},
-	function(e) {
-			var data = JSON.parse($(this).attr("data"));
-			$(this).attr("src", _printers[data.index].host + "/webcam/?action=snapshot&cache=" + Math.random());
+	//Наведение переключает на поток только в режиме снимков — при постоянной трансляции
+	//переключать уже не на что.
+	document.querySelectorAll("img.cam").forEach(function(el) {
+		var data = JSON.parse(el.getAttribute("data"));
+		if(_printers[data.index].cameraStream) return;
+
+		el.addEventListener("mouseenter", function(e) {
+			var d = JSON.parse(this.getAttribute("data"));
+			this.setAttribute("src", _printers[d.index].host + "/webcam/?action=stream");
+		});
+		el.addEventListener("mouseleave", function(e) {
+			var d = JSON.parse(this.getAttribute("data"));
+			this.setAttribute("src", _printers[d.index].host + "/webcam/?action=snapshot&cache=" + Math.random());
+		});
 	});
 
 	//toggle full screen view if image is clicked
-	$("div.cam").click(function(e) {
-		var data = JSON.parse($(this).closest(".tile").attr("data"));
+	document.querySelectorAll("div.cam").forEach(function(el) {
+		el.addEventListener("click", function(e) {
+			var data = JSON.parse(this.closest(".tile").getAttribute("data"));
 
-		baseUrl = window.location.href.split('?')[0] 
+			var baseUrl = window.location.href.split('?')[0]
 
-		if("theme" in dictQueryString) 
-			theme = dictQueryString["theme"];
+			var theme;
+			if("theme" in dictQueryString)
+				theme = dictQueryString["theme"];
 
-		//if full screen toggle back to full view
-		if("fullscreen" in dictQueryString && JSON.parse(dictQueryString["fullscreen"])) {
-			if(typeof(theme) !== "undefined") {
-				window.location.href = `${baseUrl}?theme=${theme}`;	
+			//if full screen toggle back to full view
+			if("fullscreen" in dictQueryString && JSON.parse(dictQueryString["fullscreen"])) {
+				if(typeof(theme) !== "undefined") {
+					window.location.href = `${baseUrl}?theme=${theme}`;
+				}
+				else {
+					window.location.href = baseUrl;
+				}
 			}
-			else {
-				window.location.href = baseUrl;
+			else{
+				if(typeof(theme) !== "undefined") {
+					window.location.href = `${baseUrl}?theme=${theme}&printer=${data.index}&fullscreen=1`;
+				}
+				else {
+					window.location.href = `${baseUrl}?printer=${data.index}&fullscreen=1`;
+				}
 			}
-		}
-		else{
-			if(typeof(theme) !== "undefined") {
-				window.location.href = `${baseUrl}?theme=${theme}&printer=${data.index}&fullscreen=1`;
-			}
-			else {
-				window.location.href = `${baseUrl}?printer=${data.index}&fullscreen=1`;
-			}
-		}
+		});
 	});
 }
-

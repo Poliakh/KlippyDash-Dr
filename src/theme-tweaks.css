@@ -1,0 +1,186 @@
+/* theme-tweaks.css — cosmetic overrides (add-on, not upstream). Loaded after
+ * klippydash.css, so these :root vars win. Palette mirrors Fluidd's dark theme
+ * (Material-dark emphasis: high 0.87 / medium 0.60 white) so text is comfortable —
+ * no harsh over-bright captions. Remove the <link> in index.html to disable. */
+
+:root {
+	--bg-color: #121212;            /* Fluidd page */
+	--tile-bg-color: #1e1e1e;       /* Fluidd card/surface */
+	--base-color: #1e1e1e;
+	--link-color: #2196f3;          /* Fluidd primary blue */
+	--title-text-color: rgba(255,255,255,0.87);         /* high-emphasis */
+	--text-color: rgba(255,255,255,0.60);               /* medium-emphasis: labels/secondary */
+	--tile-dynamic-text-color: rgba(255,255,255,0.87);  /* values: high-emphasis */
+	--tile-dynamic-text-hot-color: #e0836b;             /* heating (warm) */
+	--tile-dynamic-text-cold-color: #64b5f6;            /* cool */
+	--lowlight-color: #7d7d7d;      /* icons/secondary — visible but calm on #1e1e1e */
+	--highlight-color: #bdbdbd;
+	--progress-bar-bg-color: #2a2a2a;
+	--progress-bar-color: #2196f3;
+}
+
+body { background: #121212; }       /* Fluidd flat dark */
+
+.tile {
+	box-shadow: 0 2px 10px rgba(0, 0, 0, .45);
+	border: 1px solid rgba(255, 255, 255, .06);
+}
+
+/* Заголовок принтера (стоковый .title, 2em) — крупноват относительно карточек ниже; уменьшаем
+   до более гармоничного размера. Ссылка внутри: вместо стокового подчёркивания на hover —
+   лёгкая смена цвета на link-color с быстрой плавной анимацией (без underline). */
+.title-container .title {
+	font-size: 1.4em;
+	margin: 2px 0 8px 0;
+}
+.title-container .title a {
+	color: rgba(255, 255, 255, .72); /* приглушённее стокового --title-text-color (.87) — как значения в карточках */
+	transition: color .15s ease;
+}
+.title-container .title a:hover {
+	color: var(--link-color);
+	text-decoration: none;
+}
+/* Подсказка "-> Fluidd" рядом с заголовком (span добавлен из custom-controls.js, стрелка —
+   иконка Font Awesome solid: короткая и жирная, а не тонкий юникод-символ) — появляется только
+   при наведении, блёклая, плавно "выезжает" вправо. */
+.title-hint {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-left: 10px;
+	font-size: .42em;
+	font-weight: bold;
+	letter-spacing: .03em;
+	color: var(--text-color);
+	opacity: 0;
+	transform: translateX(-6px);
+	transition: opacity .32s cubic-bezier(.22, .61, .36, 1), transform .32s cubic-bezier(.22, .61, .36, 1);
+	vertical-align: middle;
+}
+.title-hint i { font-size: 1.05em; }
+.title-container .title:hover .title-hint {
+	opacity: .8;
+	transform: translateX(0);
+}
+
+/* Ширина камеры — ЖЁСТКО фиксированная (720px = 800 стоковых минус 10%), а не диапазон
+   min/max-width. Стоковый max-width:max(800px,40vw) давал рост на широких экранах, но div.cam —
+   блочный width:auto (= заполняет родителя), поэтому на широком мониторе, где vw-потолок снят,
+   ширина каждой плитки начинала зависеть от СОДЕРЖИМОГО (график/статус-текст) — а оно у принтеров
+   разное, отсюда разная ширина камеры у разных плиток. Жёсткий width исключает это полностью:
+   камера всегда одного размера, на любом экране, независимо от содержимого. */
+div.cam {
+	width: 720px;
+	height: 405px; /* = 720 * 9/16, посчитано один раз явно, а не через aspect-ratio каждый layout-pass —
+	                  на десктопе полностью исключает микро-дрожание высоты плитки (замечено: 402↔406px,
+	                  видимо от подстраховочного ресайза графика температур в temp-graph.js раз в 2с). */
+	min-width: 0;
+	max-width: 720px;
+	margin-left: auto;
+	margin-right: auto; /* панель (график/статус) шире фиксированных 720px камеры — центрируем блок камеры */
+}
+/* Полноэкранный просмотр одной плитки (штатный клик по камере, body.full-screen) — там ширина
+   растёт под min-width:60vw, наша фиксированная height:405px больше не подходит (видео растягивалось
+   по ширине, а высота оставалась прежней — пропорция ломалась). Тут высота снова считается ИЗ
+   ширины через aspect-ratio, как и должно быть при увеличении для разглядывания деталей печати. */
+body.full-screen div.cam {
+	width: auto;
+	height: auto;
+	max-width: none;
+	margin-left: 0;
+	margin-right: 0;
+}
+
+/* Плитка сама по себе была шире зафиксированной камеры (тянулась под таблицу/график температур,
+   которые у неё нет max-width) — камера центрировалась внутри и получала боковые отступы БОЛЬШЕ,
+   чем панели ниже (у тех — ровно padding тайла). Ограничиваем тайл шириной камеры + её padding,
+   тогда все панели внутри (тоже блочные, width:auto) сужаются до той же ширины, и отступы совпадают. */
+.tile { max-width: 720px; } /* .tile — content-box (padding не входит в width/max-width), поэтому
+	это должно совпадать с шириной именно содержимого — той же, что у камеры (720px), а не
+	с полной шириной плитки снаружи (720 + 2×15px padding). */
+body.full-screen .tile { max-width: none; }
+body.full-screen img.cam,
+body.full-screen div.cam.cam-offline .cam-offline-img {
+	aspect-ratio: 16 / 9;
+	height: auto;
+}
+
+img.cam {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+/* "Нет сигнала" — пока снимок не загружен/недоступен (.cam-offline ставит custom-controls.js
+   по событию error на img.cam), вместо сломанной иконки картинки — настоящая советская УЭИТ
+   (Универсальная электронная испытательная таблица), Wikimedia Commons, без цветовых фильтров.
+   Реальный <img> (добавлен custom-controls.js), а не CSS background-image — у Chromium эта
+   конкретная SVG почему-то не рисуется как background-image (грузится 200 OK, но пустой холст),
+   хотя как обычная <img>/при прямой навигации рендерится нормально. */
+div.cam.cam-offline img.cam { visibility: hidden; }
+.cam-offline-img { display: none; }
+div.cam.cam-offline .cam-offline-img {
+	display: block;
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%; /* div.cam теперь имеет явную фиксированную высоту (см. выше) — резолвится нормально */
+	object-fit: fill; /* растянуть на весь кадр, не обрезая — таблица 4:3, чуть сплющится */
+}
+
+/* Надпись "NO SIGNAL" поверх таблицы — плавно пульсирует (мигающий индикатор "нет сигнала",
+   как на вещательном оборудовании). Отдельный <span> (custom-controls.js), не часть SVG. */
+.cam-offline-label {
+	display: none;
+	position: absolute;
+	top: 50%; left: 50%;
+	transform: translate(-50%, -50%);
+	font-family: monospace;
+	font-weight: bold;
+	font-size: 28px;
+	letter-spacing: .12em;
+	color: #fff;
+	text-shadow: 0 2px 8px rgba(0, 0, 0, .8);
+	pointer-events: none;
+	animation: cam-offline-pulse 2.2s ease-in-out infinite;
+}
+div.cam.cam-offline .cam-offline-label { display: block; }
+@keyframes cam-offline-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: .35; }
+}
+
+/* align the Extruder/Bed/Chamber values into one vertical column (labels differ in width) */
+.section-extruder > .label,
+.section-bed > .label,
+.section-chamber > .label {
+	display: inline-block;
+	min-width: 84px;
+}
+
+/* --- responsive down to mobile (dev) ---
+ * Stock klippydash.css hard-codes div.cam{min-width:800px}, which forces every .tile (and
+ * everything inside it, incl. our temp-graph card) wider than most phone screens, causing
+ * horizontal page scroll instead of a real responsive layout. Relax that below 860px so the
+ * whole tile — camera, table, chart — shrinks to fit. Desktop layout (>=861px) is untouched. */
+@media (max-width: 860px) {
+	div.cam {
+		min-width: 0;
+		max-width: 100%;
+		width: 100%;
+		height: auto; /* тут ширина сама плавающая (под экран) — высота обратно через aspect-ratio */
+	}
+	img.cam, div.cam.cam-offline .cam-offline-img {
+		aspect-ratio: 16 / 9;
+		height: auto;
+	}
+	.tile {
+		margin: 12px auto;
+		max-width: calc(100vw - 24px);
+	}
+}
+
+@media (max-width: 480px) {
+	.tile { padding: 10px; margin: 8px auto; max-width: calc(100vw - 16px); }
+}

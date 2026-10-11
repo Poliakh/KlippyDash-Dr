@@ -1,0 +1,45 @@
+/* net-status.css — WiFi-style connection-quality indicator overlaid on the camera (dev add-on). */
+
+.ns-wrap {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	z-index: 5;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	pointer-events: none; /* не мешает клику по камере (переход в полноэкранный режим) */
+}
+
+.ns-icon {
+	position: relative;
+	display: flex;
+	align-items: center;
+	padding: 4px 5px;
+	background: rgba(0, 0, 0, .55);
+	border-radius: 5px;
+}
+
+.ns-bars-svg { width: 18px; height: 14px; display: block; }
+.ns-arc { stroke: rgba(255, 255, 255, .28); transition: stroke .25s ease; }
+.ns-arc.ns-arc-on { stroke: #29b6f6; }
+
+/* точка-"устройство" внизу значка — теперь сама играет роль индикатора связи (зелёная/серая),
+   отдельного бейджа-точки в углу больше нет */
+.ns-wifi-dot { fill: #6b6f76; transition: fill .25s ease, filter .25s ease; }
+.ns-wifi-dot.ns-dot-on { fill: #66bb6a; filter: drop-shadow(0 0 2px rgba(102, 187, 106, .8)); }
+
+.ns-seconds {
+	font-size: 10px;
+	color: rgba(255, 255, 255, .8);
+	background: rgba(0, 0, 0, .55);
+	padding: 1px 5px;
+	border-radius: 4px;
+	white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+	.ns-wrap { top: 6px; right: 6px; }
+	.ns-bars-svg { width: 14px; height: 11px; }
+}

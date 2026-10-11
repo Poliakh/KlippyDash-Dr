@@ -1,0 +1,327 @@
+/* settings-panel.css — add-on for the slide-out printer-settings panel (settings-panel.js). */
+
+#sp-gear-btn {
+	position: fixed;
+	top: 14px;
+	right: 14px;
+	z-index: 500;
+	width: 38px;
+	height: 38px;
+	border-radius: 50%;
+	border: 1px solid rgba(255, 255, 255, .1);
+	background: rgba(30, 30, 30, .85);
+	color: var(--text-color);
+	font-size: 16px;
+	cursor: pointer;
+	transition: color .15s ease, transform .3s ease, background .15s ease;
+}
+#sp-gear-btn:hover { color: var(--link-color); background: rgba(40, 40, 40, .95); }
+#sp-gear-btn.sp-gear-active { transform: rotate(90deg); color: var(--link-color); }
+
+#sp-panel {
+	position: fixed;
+	top: 0;
+	right: 0;
+	width: min(440px, 100vw);
+	height: 100vh;
+	background: var(--tile-bg-color);
+	border-left: 1px solid rgba(255, 255, 255, .08);
+	box-shadow: -8px 0 24px rgba(0, 0, 0, .5);
+	z-index: 499;
+	display: flex;
+	flex-direction: column;
+	transform: translateX(100%);
+	transition: transform .28s ease;
+}
+#sp-panel.sp-open { transform: translateX(0); }
+
+.sp-header {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 16px 18px;
+	font-weight: bold;
+	color: var(--title-text-color);
+	border-bottom: 1px solid rgba(255, 255, 255, .08);
+	flex: 0 0 auto;
+}
+.sp-header i { color: var(--link-color); }
+
+.sp-list {
+	flex: 1 1 auto;
+	overflow-y: auto;
+	padding: 8px 12px;
+	/* кастомный скролл в тон панели вместо стандартного системного (Firefox) */
+	scrollbar-width: thin;
+	scrollbar-color: rgba(255, 255, 255, .25) transparent;
+}
+/* Chrome/Edge — тот же дашборд, что и везде в проекте */
+.sp-list::-webkit-scrollbar { width: 8px; }
+.sp-list::-webkit-scrollbar-track { background: transparent; }
+.sp-list::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, .18);
+	border-radius: 4px;
+}
+.sp-list::-webkit-scrollbar-thumb:hover { background: var(--link-color); }
+
+.sp-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 6px;
+	border-radius: 8px;
+	cursor: grab;
+}
+.sp-row:hover { background: rgba(255, 255, 255, .04); }
+.sp-row.sp-dragging { opacity: .4; }
+.sp-row.sp-drop-target { background: rgba(33, 150, 243, .15); outline: 1px dashed var(--link-color); }
+.sp-drag { color: var(--lowlight-color); cursor: grab; flex: 0 0 auto; }
+.sp-led {
+	width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto;
+	background: var(--lowlight-color);
+	transition: background .2s ease, box-shadow .2s ease;
+}
+.sp-led.sp-led-on { background: #66bb6a; box-shadow: 0 0 6px 1px rgba(102, 187, 106, .6); }
+.sp-led.sp-led-off { background: #ef5350; box-shadow: 0 0 6px 1px rgba(239, 83, 80, .5); }
+.sp-name { flex: 1; color: var(--title-text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-row-actions { display: flex; gap: 4px; flex: 0 0 auto; }
+.sp-icon-btn {
+	width: 26px; height: 26px;
+	border: none; border-radius: 6px;
+	background: transparent;
+	color: var(--text-color);
+	cursor: pointer;
+	transition: background .12s ease, color .12s ease;
+}
+.sp-icon-btn:hover { background: rgba(255, 255, 255, .08); color: var(--title-text-color); }
+.sp-del-btn:hover { color: #ef5350; }
+
+.sp-form {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px 10px 14px 27px;
+	margin-bottom: 4px;
+	background: rgba(255, 255, 255, .025);
+	border-radius: 8px;
+}
+.sp-form[hidden] { display: none; }
+.sp-form label {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .03em;
+	color: var(--text-color);
+}
+/* Переключатель в форме принтера: флажок и подпись в строку, а не в столбец, как у .sp-form label */
+.sp-form label.sp-toggle-row {
+	flex-direction: row;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	text-transform: none;
+	font-size: 13px;
+	color: var(--title-text-color);
+	cursor: pointer;
+}
+.sp-form label.sp-toggle-row input[type="checkbox"] {
+	width: 16px;
+	height: 16px;
+	flex: 0 0 auto;
+	accent-color: var(--link-color);
+	cursor: pointer;
+}
+.sp-form .sp-hint {
+	flex: 1 0 100%;
+	font-size: 11px;
+	text-transform: none;
+	letter-spacing: 0;
+	color: var(--lowlight-color, #888);
+}
+
+.sp-form input, .sp-form textarea {
+	font-family: inherit;
+	font-size: 13px;
+	color: var(--title-text-color);
+	background: rgba(0, 0, 0, .25);
+	border: 1px solid rgba(255, 255, 255, .1);
+	border-radius: 6px;
+	padding: 6px 8px;
+	resize: vertical;
+}
+.sp-form textarea {
+	font-family: monospace;
+	font-size: 12px;
+	resize: none; /* своя ручка по центру нижней кромки вместо родного resize из угла — см. .sp-resize-handle */
+	width: 100%;
+	box-sizing: border-box;
+	transition: height .25s ease; /* плавный возврат к исходной высоте при уходе с поля (blur) */
+}
+.sp-form textarea.sp-json-error { border-color: #ef5350; }
+
+/* Обёртка вокруг textarea+ручки — сама ручка позиционируется относительно неё, "наполовину"
+   перекрывая нижнюю кромку поля, по центру. */
+.sp-resizable { position: relative; display: block; }
+.sp-resize-handle {
+	position: absolute;
+	left: 50%; bottom: -7px;
+	transform: translateX(-50%);
+	width: 34px; height: 14px;
+	display: flex; align-items: center; justify-content: center;
+	background: rgba(255, 255, 255, .1);
+	border: 1px solid rgba(255, 255, 255, .18);
+	border-radius: 4px;
+	cursor: ns-resize;
+	touch-action: none;
+	transition: background .12s ease;
+}
+.sp-resize-handle:hover { background: var(--link-color); border-color: var(--link-color); }
+.sp-resize-handle span {
+	width: 16px; height: 2px;
+	background: rgba(255, 255, 255, .55);
+	box-shadow: 0 4px 0 rgba(255, 255, 255, .55); /* вторая полоска — "≡"-образная зацепка */
+}
+/* во время активного перетаскивания transition отключаем — иначе высота "отстаёт" от курсора */
+.sp-form textarea.sp-resizing { transition: none; }
+
+.sp-form-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.sp-test-btn {
+	display: inline-flex; align-items: center; gap: 6px;
+	padding: 6px 12px;
+	border-radius: 6px;
+	border: 1px solid rgba(255, 255, 255, .12);
+	background: rgba(255, 255, 255, .05);
+	color: var(--title-text-color);
+	cursor: pointer;
+	font-size: 12px;
+}
+.sp-test-btn:hover { background: rgba(255, 255, 255, .1); }
+.sp-test-result { font-size: 12px; color: var(--text-color); }
+.sp-test-result.sp-test-ok { color: #66bb6a; }
+.sp-test-result.sp-test-fail { color: #ef5350; }
+
+.sp-add-btn {
+	flex: 0 0 auto;
+	margin: 4px 16px 12px;
+	padding: 9px;
+	border-radius: 8px;
+	border: 1px dashed rgba(255, 255, 255, .18);
+	background: transparent;
+	color: var(--text-color);
+	cursor: pointer;
+	font-size: 13px;
+}
+.sp-add-btn:hover { background: rgba(255, 255, 255, .04); color: var(--title-text-color); }
+
+.sp-save-card-btn, .sp-close-card-btn {
+	display: inline-flex; align-items: center; gap: 6px;
+	padding: 6px 12px;
+	border-radius: 6px;
+	border: 1px solid rgba(255, 255, 255, .12);
+	background: rgba(255, 255, 255, .05);
+	color: var(--title-text-color);
+	cursor: pointer;
+	font-size: 12px;
+}
+.sp-save-card-btn:hover, .sp-close-card-btn:hover { background: rgba(255, 255, 255, .1); }
+/* Несохранённые правки — кнопка Save заметно выделяется (цвет + пульсирующая точка) */
+.sp-save-card-btn.sp-dirty {
+	background: var(--link-color);
+	border-color: var(--link-color);
+	color: #fff;
+	position: relative;
+}
+.sp-save-card-btn.sp-dirty::after {
+	content: "";
+	position: absolute;
+	top: -3px; right: -3px;
+	width: 8px; height: 8px;
+	border-radius: 50%;
+	background: #ffb300;
+	animation: sp-dirty-pulse 1.4s ease-in-out infinite;
+}
+@keyframes sp-dirty-pulse {
+	0%, 100% { opacity: 1; transform: scale(1); }
+	50% { opacity: .5; transform: scale(1.3); }
+}
+
+/* Модалка "данные не сохранены" */
+#sp-modal {
+	position: fixed; inset: 0; z-index: 600;
+	display: flex; align-items: center; justify-content: center;
+	background: rgba(0, 0, 0, .55);
+}
+#sp-modal[hidden] { display: none; } /* [hidden] из UA-стиля перебивается display:flex выше без этого */
+.sp-modal-box {
+	background: var(--tile-bg-color);
+	border: 1px solid rgba(255, 255, 255, .1);
+	border-radius: 10px;
+	box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
+	padding: 20px 22px;
+	min-width: 280px;
+	text-align: center;
+}
+.sp-modal-text { color: var(--title-text-color); font-weight: bold; margin-bottom: 16px; }
+.sp-modal-actions { display: flex; gap: 10px; justify-content: center; }
+.sp-modal-save, .sp-modal-discard {
+	padding: 8px 16px;
+	border-radius: 6px;
+	border: 1px solid rgba(255, 255, 255, .12);
+	cursor: pointer;
+	font-size: 13px;
+}
+.sp-modal-save { background: var(--link-color); border-color: var(--link-color); color: #fff; font-weight: bold; }
+.sp-modal-discard { background: rgba(255, 255, 255, .05); color: var(--title-text-color); }
+.sp-modal-discard:hover { background: rgba(255, 255, 255, .1); }
+
+.sp-mon-section {
+	flex: 0 0 auto;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin: 0 16px 16px;
+	padding: 12px 14px 14px;
+	background: rgba(255, 255, 255, .025);
+	border: 1px solid rgba(255, 255, 255, .08);
+	border-radius: 8px;
+}
+.sp-mon-title {
+	display: flex; align-items: center; gap: 8px;
+	font-weight: bold;
+	color: var(--title-text-color);
+	margin-bottom: 2px;
+}
+.sp-mon-title i { color: var(--link-color); }
+.sp-mon-section label {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .03em;
+	color: var(--text-color);
+}
+.sp-mon-toggle-row {
+	flex-direction: row !important;
+	align-items: center;
+	gap: 8px !important;
+	text-transform: none;
+	font-size: 13px !important;
+	color: var(--title-text-color) !important;
+}
+.sp-mon-toggle-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--link-color); }
+.sp-mon-section input[type="number"] {
+	font-family: inherit;
+	font-size: 13px;
+	color: var(--title-text-color);
+	background: rgba(0, 0, 0, .25);
+	border: 1px solid rgba(255, 255, 255, .1);
+	border-radius: 6px;
+	padding: 6px 8px;
+}
+
+@media (max-width: 480px) {
+	#sp-panel { width: 100vw; }
+}
