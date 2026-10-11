@@ -1,0 +1,111 @@
+{
+  "printers": [
+    {
+      "name": "Printer 1",
+      "host": "http://192.168.0.10:7125",
+      "preheatProfiles": [
+        {
+          "name": "PLA",
+          "extruder": 200,
+          "bed": 60
+        },
+        {
+          "name": "ABS",
+          "extruder": 150,
+          "bed": 100,
+          "chamber": 60,
+          "nozzleAfterBed": 95
+        },
+        {
+          "name": "ASA",
+          "extruder": 240,
+          "bed": 100,
+          "chamber": 60,
+          "nozzleAfterBed": 95
+        }
+      ],
+      "light": "LED",
+      "chamberSensor": "temperature_fan chamber_fan",
+      "fans": [
+        {
+          "label": "Part",
+          "object": "output_pin fan0",
+          "color": "#ef5350"
+        },
+        {
+          "label": "Side",
+          "object": "output_pin fan2",
+          "color": "#5ec8ff"
+        },
+        {
+          "label": "Exhaust",
+          "object": "output_pin fan1",
+          "color": "#66bb6a"
+        },
+        {
+          "label": "Hotend",
+          "object": "heater_fan hotend_fan",
+          "color": "#9aa0ab"
+        }
+      ],
+      "cameraStream": true
+    },
+    {
+      "name": "Printer 2",
+      "host": "http://192.168.0.11:7125",
+      "preheatProfiles": [
+        {
+          "name": "PLA",
+          "extruder": 200,
+          "bed": 60
+        },
+        {
+          "name": "ABS",
+          "extruder": 150,
+          "bed": 100,
+          "chamber": 60,
+          "nozzleAfterBed": 95
+        },
+        {
+          "name": "ASA",
+          "extruder": 240,
+          "bed": 100,
+          "chamber": 60,
+          "nozzleAfterBed": 95
+        }
+      ],
+      "light": "caselight",
+      "chamberSensor": "heater_generic hot",
+      "fans": [
+        {
+          "label": "Part",
+          "object": "fan",
+          "color": "#ef5350"
+        },
+        {
+          "label": "Side",
+          "object": "output_pin aux_part_fan",
+          "color": "#5ec8ff"
+        },
+        {
+          "label": "Exhaust",
+          "object": "output_pin exhaust_fan",
+          "color": "#66bb6a"
+        },
+        {
+          "label": "Hotend",
+          "object": "heater_fan hotend_fan",
+          "color": "#9aa0ab"
+        }
+      ]
+    }
+  ],
+  "ajaxTimeout": 15000,
+  "monitoring": {
+    "enabled": true,
+    "confidenceThreshold": 0.4,
+    "sustainCount": 3,
+    "pollSeconds": 20,
+    "cooldownSeconds": 300
+  }
+}
