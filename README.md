@@ -1,159 +1,159 @@
 # KlippyDash-Dr
 
-Доработанный [KlippyDash](https://github.com/nixkor/KlippyDash) — лёгкий дашборд для
-принтеров на Klipper, работающий через API [Moonraker](https://github.com/Arksine/moonraker).
+A reworked [KlippyDash](https://github.com/nixkor/KlippyDash) — a lightweight dashboard for
+Klipper printers, built on the [Moonraker](https://github.com/Arksine/moonraker) API.
 
-Форк живёт в мастерской с двумя принтерами, Creality K1C и QIDI MAX3, и вырос из простой
-задачи: видеть оба принтера на одном экране и не прыгать между окнами браузера. Поэтому
-главное отличие от оригинала — приложение стало рабочим местом целиком, а не только
-обзорной панелью.
-
-<p align="center">
-  <img src="docs/img/dashboard.jpg" width="800" alt="Дашборд: вкладки принтеров слева, камера, управление, ход печати, температуры и вентиляторы" />
-</p>
-
-## Чем отличается от оригинала
-
-**Вкладки Fluidd внутри страницы.** Слева по всей высоте — рельса вкладок: «Обзор» и по
-вкладке на принтер. На вкладке принтера Fluidd открыт на всю страницу. Все Fluidd грузятся
-при старте и живут в DOM постоянно, так что переключение мгновенное и состояние Fluidd
-(открытая вкладка, прокрутка, консоль) не теряется. Окно браузера одно на всё.
-
-**Панель управления под камерой.** Преднагрев по профилям, охлаждение, свет в камере,
-вентиляторы, firmware restart, аварийный стоп.
-
-**Температуры.** Таблица в стиле Fluidd и график на uPlot: промежуточные пунктирные линии
-сетки и значения в точке курсора, каждое цветом своей линии.
-
-**Ход печати.** Отдельная карточка с прогрессом, временем и z-offset, который читается
-напрямую из `gcode_move`, а не из конфигурации.
-
-**Наблюдение за печатью.** Служба `print-watchdog` смотрит в камеру через детектор Obico и
-при подозрении на спагетти шлёт уведомление в Telegram. Состояние показывает индикатор-глаз
-на дашборде, он же открывает журнал событий.
-
-**Связь.** Значок состояния связи поверх камеры: видно, когда принтер отвалился и как давно.
-
-**Настройки в интерфейсе.** `settings.json` правится прямо на странице, без текстового
-редактора.
+This fork runs in a workshop with two printers, a Creality K1C and a QIDI MAX3, and grew out
+of one plain need: see both machines on a single screen and stop hopping between browser
+windows. So the main difference from upstream is that the dashboard became the whole
+workplace, not just an overview panel.
 
 <p align="center">
-  <img src="docs/img/settings-panel.jpg" width="800" alt="Выдвинутая панель настроек с раскрытой карточкой принтера" />
+  <img src="docs/img/dashboard.jpg" width="900" alt="Dashboard: printer tabs on the left, cameras, controls, print status, temperatures and fans" />
 </p>
 
-**Камера.** Режим снимков или непрерывный поток, переключается на каждый принтер отдельно.
+## What this fork adds
 
-## Установка
+**Fluidd tabs inside the page.** A rail down the left edge holds an Overview tab plus one tab
+per printer. A printer tab shows that printer's Fluidd full-page. Every Fluidd is loaded at
+startup and stays in the DOM, so switching is instant and Fluidd keeps its state — open tab,
+scroll position, console history. One browser window for everything.
 
-Нужен Python 3. Клонируете, копируете пример настроек и правите под себя:
+**Control bar under the camera.** Preheat profiles, cooldown, chamber light, fans, firmware
+restart, emergency stop.
+
+**Temperatures.** A Fluidd-style table and a uPlot chart with dashed intermediate gridlines
+and per-series values at the cursor, each in its own line's color.
+
+**Print status.** A dedicated card with progress, timings and the Z-offset read straight from
+`gcode_move` rather than from the config file.
+
+**Print monitoring.** The `print-watchdog` service watches the cameras through Obico's
+detector and sends a Telegram message when it suspects spaghetti. An eye icon on the
+dashboard shows the service state and opens the event log.
+
+**Link status.** A connection indicator over each camera: you can see when a printer dropped
+off and how long ago.
+
+**Settings in the UI.** `settings.json` is editable on the page, no text editor needed.
+
+<p align="center">
+  <img src="docs/img/settings-panel.jpg" width="900" alt="Settings panel slid out with a printer card expanded" />
+</p>
+
+**Camera.** Snapshot mode or continuous stream, switchable per printer.
+
+## Install
+
+Python 3 is the only requirement. Clone, copy the example config and edit it:
 
 ```bash
-git clone https://github.com/<аккаунт>/KlippyDash-Dr.git
+git clone https://github.com/Poliakh/KlippyDash-Dr.git
 cd KlippyDash-Dr
 cp src/settings.example.json src/settings.json
 ```
 
-В `settings.json` укажите адреса принтеров — это адрес Moonraker или веб-морды, например
-`http://192.168.0.10:7125`. Остальные ключи описаны там же по месту.
-
-Запуск — одним файлом:
+Then start everything with one file:
 
 ```
 start-klippydash.bat
 ```
 
-Поднимает три части разом и без консольных окон: локальный веб-сервер на `8899`, детектор
-`ml_api` на `3333` и службу наблюдения на `3334`. Останавливает всё
-`stop-klippydash.bat`, включая веб-сервер.
+It brings up three parts at once and without console windows: the local web server on `8899`,
+the `ml_api` detector on `3333` and the monitoring service on `3334`. `stop-klippydash.bat`
+shuts them all down, the web server included.
 
-Если наблюдение не нужно, достаточно `python serve.py` — дашборд работает сам по себе,
-индикатор-глаз просто покажет, что служба не запущена.
+If you do not need monitoring, `python serve.py` is enough on its own — the dashboard works
+standalone and the eye icon simply reports that the service is not running.
 
-## Добавление и настройка принтера
+## Adding and configuring a printer
 
-Проще всего — через значок шестерёнки в правом верхнем углу: **Добавить принтер**, заполнить
-поля, **Save**. Кнопка **Test** рядом проверяет связь до сохранения. Панель пишет тот же
-`src/settings.json`, так что его можно править и руками — результат одинаковый.
+The easy way is the gear icon in the top right corner: **Add printer**, fill the fields,
+**Save**. The **Test** button next to it checks the connection before you commit. The panel
+writes the same `src/settings.json`, so editing the file by hand gives an identical result.
 
-### Обязательные поля
+### Required fields
 
-| Поле | Что это |
+| Field | Meaning |
 |---|---|
-| `name` | Имя на плитке и на боковой вкладке |
-| `host` | Адрес Moonraker со схемой и портом, без слеша в конце |
+| `name` | Shown on the tile and on the side tab |
+| `host` | Moonraker address with scheme and port, no trailing slash |
 
-С `host` чаще всего и возникает заминка. Нужен адрес **Moonraker**, а не веб-морды, хотя
-на многих принтерах это одно и то же. Как проверить — открыть в браузере
-`http://адрес:порт/printer/info`: если вернулся JSON, адрес верный.
+`host` is where people usually stumble. It must point at **Moonraker**, not at the web
+interface — though on many printers these are the same thing. To check, open
+`http://address:port/printer/info` in a browser: if JSON comes back, the address is right.
 
-- Обычный Klipper (mainsail/fluidd из KIAUH) — порт `7125`.
-- Creality K1/K1C — Moonraker проксируется веб-мордой, подходит её же адрес, например
-  `http://192.168.0.10:4408`.
-- QIDI — веб-морда на `10088`, Moonraker там же.
+- Stock Klipper (mainsail/fluidd via KIAUH) — port `7125`.
+- Creality K1/K1C — Moonraker is proxied by the web interface, so its address works, for
+  example `http://192.168.0.10:4408`.
+- QIDI — web interface on `10088`, Moonraker served from the same port.
 
-Лучше указывать IP, а не `имя.local`: mDNS в локальных сетях отваливается чаще, чем хотелось бы,
-а дашборд опрашивает принтер непрерывно. Адрес стоит закрепить за принтером в DHCP роутера.
+Prefer an IP over `name.local`. mDNS drops out more often than you would like on local
+networks, and the dashboard polls the printer continuously. Pin the address to the printer
+in your router's DHCP reservations.
 
-### Необязательные поля
+### Optional fields
 
-**`light`** — имя пина подсветки, по нему работает кнопка света. Это то, что стоит в
-`printer.cfg` после `[output_pin ...]`: у K1C `LED`, у QIDI `caselight`. Нет такой секции —
-ключ не указывайте, кнопка просто не появится.
+**`light`** — the name of the light pin, used by the light button. It is whatever follows
+`[output_pin ...]` in `printer.cfg`: `LED` on a K1C, `caselight` on a QIDI. If there is no
+such section, leave the key out and the button will not appear.
 
-**`chamberSensor`** — датчик температуры камеры целиком, с типом объекта:
-`temperature_fan chamber_fan`, `heater_generic hot`, `temperature_sensor chamber`. Полный
-список имён — в `/printer/objects/list` у того же Moonraker.
+**`chamberSensor`** — the chamber temperature sensor, written with its object type:
+`temperature_fan chamber_fan`, `heater_generic hot`, `temperature_sensor chamber`. The full
+list of names is available at `/printer/objects/list` on the same Moonraker.
 
-**`fans`** — какие вентиляторы показывать и как их назвать. Имена в `printer.cfg` обычно
-ничего не говорят стороннему человеку, поэтому подпись задаётся отдельно от объекта:
+**`fans`** — which fans to show and what to call them. Klipper's own names rarely mean
+anything to a bystander, so the label is configured separately from the object:
 
 ```json
 { "label": "Exhaust", "object": "output_pin fan1", "color": "#66bb6a" }
 ```
 
-`object` — имя из Klipper целиком (`fan`, `output_pin fan0`, `heater_fan hotend_fan`),
-`label` — что увидите на экране, `color` — цвет значка.
+`object` is the full Klipper name (`fan`, `output_pin fan0`, `heater_fan hotend_fan`),
+`label` is what appears on screen, `color` is the icon color.
 
-**`preheatProfiles`** — кнопки преднагрева. `extruder` и `bed` обязательны, `chamber` нужен
-только если есть датчик камеры. `nozzleAfterBed` — температура, до которой сопло догревается
-**после** выхода стола на режим: при печати ABS и ASA сопло держат пониже, пока греется
-камера, чтобы не запекать филамент в горячем сопле без движения.
+**`preheatProfiles`** — the preheat buttons. `extruder` and `bed` are required; `chamber`
+only matters if a chamber sensor exists. `nozzleAfterBed` is the temperature the nozzle rises
+to *after* the bed reaches its target: when printing ABS or ASA the nozzle is kept lower while
+the chamber heats up, so filament is not cooked in a hot, idle nozzle.
 
-**`cameraStream`** — `true` включает непрерывный поток вместо снимка раз в секунду. Поток
-нагружает и сеть, и плату принтера, поэтому по умолчанию выключен; без него видео
-подхватывается при наведении мыши.
+**`cameraStream`** — `true` switches from one snapshot per second to a continuous stream.
+Streaming loads both the network and the printer's board, so it is off by default; without it
+the video starts on mouse hover.
 
-### Общие настройки
+### Global settings
 
-`ajaxTimeout` — сколько ждать ответа принтера (мс). Блок `monitoring` относится к службе
-наблюдения: порог уверенности детектора, сколько срабатываний подряд нужно для тревоги,
-интервал проверки и пауза между повторными уведомлениями.
+`ajaxTimeout` is how long to wait for a printer to answer, in milliseconds. The `monitoring`
+block belongs to the watchdog service: detector confidence threshold, how many consecutive
+hits are needed to raise an alert, the polling interval and the pause between repeat
+notifications.
 
-После сохранения из панели страница подхватывает изменения сама. Если правили файл руками —
-обновите страницу.
+Changes saved from the panel are picked up automatically. If you edited the file by hand,
+reload the page.
 
-## Уведомления в Telegram
+## Telegram notifications
 
-Создайте `print-watchdog/telegram_config.json`:
+Create `print-watchdog/telegram_config.json`:
 
 ```json
 { "bot_token": "...", "chat_id": "..." }
 ```
 
-Файл исключён через `.gitignore` и в репозиторий не попадает. Подробности —
-в [print-watchdog/README.md](print-watchdog/README.md).
+The file is excluded through `.gitignore` and never reaches the repository. See
+[print-watchdog/README.md](print-watchdog/README.md) for details.
 
-## Что не хранится в репозитории
+## Not stored in this repository
 
-`src/settings.json` (адреса принтеров и состав оборудования конкретной установки),
-`print-watchdog/telegram_config.json` (токен бота), журнал событий и логи служб.
+`src/settings.json` (printer addresses and the hardware of one particular installation),
+`print-watchdog/telegram_config.json` (bot token), the event log and service logs.
+Addresses and job names are blurred in the screenshots above for the same reason.
 
-## Происхождение и лицензии
+## Origin and licenses
 
-Основа — [KlippyDash](https://github.com/nixkor/KlippyDash) авторства nixkor, лицензия
-в файле [LICENSE](LICENSE). Апстрим подключён как remote `upstream`, обновления оттуда
-подтягиваются обычным `git fetch upstream`.
+Based on [KlippyDash](https://github.com/nixkor/KlippyDash) by nixkor; its license is in
+[LICENSE](LICENSE). Upstream is wired up as the `upstream` remote, so updates come in with a
+plain `git fetch upstream`.
 
-Детектор дефектов в `print-watchdog/ml_api/` — вендоренная копия из проекта
-[Obico](https://github.com/TheSpaghettiDetective/obico-server) под AGPL-3.0, авторство
-принадлежит ему.
+The failure detector in `print-watchdog/ml_api/` is a vendored copy from the
+[Obico](https://github.com/TheSpaghettiDetective/obico-server) project, AGPL-3.0, and belongs
+to its authors.
