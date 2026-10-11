@@ -1,0 +1,169 @@
+/* nav-tabs.css — вертикальная панель вкладок у левого края и полноэкранные страницы Fluidd.
+   Приложение остаётся одностраничным: ничего не перезагружается, вкладки просто показывают
+   и прячут уже существующие в DOM блоки. Дашборд при этом продолжает опрашивать принтеры
+   в фоне, поэтому возврат на него всегда мгновенный и с актуальными данными. */
+
+:root {
+	--nt-rail-width: 68px;
+}
+
+/* Рельса. position:fixed, чтобы не уезжала при прокрутке длинного дашборда. */
+#nt-rail {
+	position: fixed;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	z-index: 900;
+	width: var(--nt-rail-width);
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 4px;
+	padding: 10px 6px;
+	box-sizing: border-box;
+	background: #171717;
+	border-right: 1px solid rgba(255, 255, 255, .07);
+	overflow-y: auto;
+	overflow-x: hidden;
+	-webkit-user-select: none; user-select: none;
+}
+#nt-rail::-webkit-scrollbar { width: 0; }
+
+/* Контент дашборда сдвигаем вправо на ширину рельсы. Через padding у body, а не margin,
+   чтобы не ломать центрирование плиток (#klippydash{text-align:center}). */
+body.nt-on { padding-left: var(--nt-rail-width); }
+
+.nt-tab {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	padding: 9px 2px;
+	border-radius: 8px;
+	color: var(--text-color);
+	cursor: pointer;
+	text-decoration: none;
+	transition: background .12s ease, color .12s ease;
+}
+.nt-tab:hover { background: rgba(255, 255, 255, .06); color: var(--title-text-color); }
+
+/* Активная вкладка: подсветка плюс оранжевая полоска у самого края, как в Fluidd. */
+.nt-tab.nt-active { background: rgba(255, 122, 60, .13); color: #ff7a3c; }
+.nt-tab.nt-active::before {
+	content: "";
+	position: absolute;
+	left: -6px;
+	top: 6px;
+	bottom: 6px;
+	width: 3px;
+	border-radius: 0 3px 3px 0;
+	background: #ff7a3c;
+}
+
+.nt-tab-icon { font-size: 17px; line-height: 1; }
+
+/* Подпись узкая — режем многоточием, полное имя остаётся в title/подсказке. */
+.nt-tab-label {
+	max-width: 100%;
+	font-size: 10px;
+	line-height: 1.2;
+	text-align: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.nt-sep {
+	height: 1px;
+	margin: 6px 4px;
+	background: rgba(255, 255, 255, .08);
+	flex: none;
+}
+
+/* Подсказка с полным именем принтера — своя, а не нативный title: нативная всплывает
+   с задержкой и в чужом оформлении (ту же проблему уже решали у значка наблюдения). */
+#nt-tip {
+	position: fixed;
+	z-index: 1000;
+	padding: 5px 9px;
+	border-radius: 6px;
+	background: rgba(23, 23, 23, .96);
+	border: 1px solid rgba(255, 255, 255, .1);
+	color: var(--title-text-color);
+	font-size: 12px;
+	white-space: nowrap;
+	pointer-events: none;
+	opacity: 0;
+	transform: translateY(-50%);
+	transition: opacity .12s ease;
+}
+#nt-tip.nt-tip-on { opacity: 1; }
+
+/* Страница принтера: занимает всё место справа от рельсы. fixed + inset, чтобы iframe
+   получил реальную высоту (у iframe нет собственной, от процентов он схлопывается в 150px). */
+.nt-view {
+	position: fixed;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: var(--nt-rail-width);
+	z-index: 800;
+	display: none;
+	background: #121212;
+}
+.nt-view.nt-view-on { display: block; }
+
+.nt-view iframe {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border: 0;
+}
+
+/* Заглушка, пока Fluidd грузится, и сообщение, если он так и не отдался. */
+.nt-view-msg {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 14px;
+	color: var(--text-color);
+	font-size: 14px;
+	text-align: center;
+	padding: 24px;
+	background: #121212;
+}
+.nt-view-msg[hidden] { display: none; }
+.nt-view-msg .nt-msg-host { color: var(--title-text-color); font-size: 13px; }
+.nt-view-msg .nt-msg-hint { font-size: 12px; max-width: 420px; line-height: 1.5; }
+.nt-view-msg .nt-msg-btn {
+	display: inline-flex; align-items: center; gap: 7px;
+	padding: 7px 13px;
+	border-radius: 7px;
+	border: 1px solid rgba(255, 255, 255, .12);
+	background: rgba(255, 255, 255, .04);
+	color: var(--title-text-color);
+	font-size: 13px;
+	text-decoration: none;
+	cursor: pointer;
+}
+.nt-view-msg .nt-msg-btn:hover { background: rgba(255, 255, 255, .09); }
+.nt-spinner {
+	width: 26px; height: 26px;
+	border: 2px solid rgba(255, 255, 255, .14);
+	border-top-color: #ff7a3c;
+	border-radius: 50%;
+	animation: nt-spin .8s linear infinite;
+}
+@keyframes nt-spin { to { transform: rotate(360deg); } }
+
+/* На узких экранах рельса ужимается до иконок. */
+@media (max-width: 560px) {
+	:root { --nt-rail-width: 46px; }
+	.nt-tab-label { display: none; }
+	.nt-tab { padding: 11px 2px; }
+}
