@@ -133,19 +133,30 @@ reload the page.
 
 ## Telegram notifications
 
-Create `print-watchdog/telegram_config.json`:
+Copy the example and fill in your own values:
 
-```json
-{ "bot_token": "...", "chat_id": "..." }
+```bash
+cp print-watchdog/telegram_config.example.json print-watchdog/telegram_config.json
 ```
 
 The file is excluded through `.gitignore` and never reaches the repository. See
 [print-watchdog/README.md](print-watchdog/README.md) for details.
 
-## Not stored in this repository
+## Configuration files
 
-`src/settings.json` (printer addresses and the hardware of one particular installation),
-`print-watchdog/telegram_config.json` (bot token), the event log and service logs.
+Everything that differs between installations lives in two files, and neither is in the
+repository — each ships as an `.example` placeholder with the same structure:
+
+| Real file (git-ignored) | Example in the repo | Holds |
+|---|---|---|
+| `src/settings.json` | `src/settings.example.json` | Printers: addresses, names, preheat profiles, fans, chamber sensor, light pin, monitoring thresholds |
+| `print-watchdog/telegram_config.json` | `print-watchdog/telegram_config.example.json` | Telegram bot token and chat id |
+
+They are deliberately kept apart. The dashboard serves `settings.json` over the LAN through
+`/api/settings` so the watchdog and the in-page settings editor can read it; a bot token in
+that file would be readable by anything on the network.
+
+Also not stored here: the event log and service logs.
 Addresses and job names are blurred in the screenshots above for the same reason.
 
 ## Origin and licenses

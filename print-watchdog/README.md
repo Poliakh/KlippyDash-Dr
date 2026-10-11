@@ -23,7 +23,11 @@ Two parts:
 `telegram_config.json` (bot token and chat id), `events.json` and `logs/` are excluded via
 `.gitignore`. A token must not reach git history even for a single commit — deleting it in
 the next commit does not remove it, it stays in the repository objects and has to be revoked.
-Create the file locally:
+Copy the example and fill it in:
+
+```bash
+cp print-watchdog/telegram_config.example.json print-watchdog/telegram_config.json
+```
 
 ```json
 { "bot_token": "...", "chat_id": "..." }
