@@ -1,64 +1,88 @@
-# KlippyDash
-Lightweight Klipper Dashboard built on [Moonraker](https://github.com/Arksine/moonraker) API
+# KlippyDash-Dr
 
-<p style="text-align:center;">
-  <img src="docs/img/screenshot.jpg" width="800" />
-</p>
+Доработанный [KlippyDash](https://github.com/nixkor/KlippyDash) — лёгкий дашборд для
+принтеров на Klipper, работающий через API [Moonraker](https://github.com/Arksine/moonraker).
 
-## Why?
-Other UIs are great for control, but I was looking for a lightweight dashboard that shows only the information I care about.  I wanted something that could handle multiple printers and would display quickly and cleanly on both desktop and mobile.
+Форк живёт в мастерской с двумя принтерами, Creality K1C и QIDI MAX3, и вырос из простой
+задачи: видеть оба принтера на одном экране и не прыгать между окнами браузера. Поэтому
+главное отличие от оригинала — приложение стало рабочим местом целиком, а не только
+обзорной панелью.
 
-A great use case for this is the device tab in [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer).  KlippyDash will give you a view of whats happening, without adding unnecessary bloat to OrcaSlicer.
+## Чем отличается от оригинала
 
+**Вкладки Fluidd внутри страницы.** Слева по всей высоте — рельса вкладок: «Обзор» и по
+вкладке на принтер. На вкладке принтера Fluidd открыт на всю страницу. Все Fluidd грузятся
+при старте и живут в DOM постоянно, так что переключение мгновенное и состояние Fluidd
+(открытая вкладка, прокрутка, консоль) не теряется. Окно браузера одно на всё.
 
-<p style="text-align:center;">
-  <img src="docs/img/orcaslicer.jpg" width="800" />
-</p>>
+**Панель управления под камерой.** Преднагрев по профилям, охлаждение, свет в камере,
+вентиляторы, firmware restart, аварийный стоп.
 
-## Features
-* Camera View
-  * Snapshot refreshes every second rather than streaming.  Will stream on mouse hover.
-* Printing Metrics
-  * Filename
-  * Extruder Temp
-  * Bed Temp
-  * Print Times & Estimates
-  * Filament Used
-* Dynamic Controls - show the controls that matter based on print state.
-  * Pause
-  * Resume
-  * Cancel
-  * E-Stop
-* Themes! - via querystring - Set default themees.  Override themes with querystring (e.g. `/index.html?theme=miami`).  Current options: default, light, dark, miami, orcaslicer
-* Filterable Printers via querystring - pass comma-separated list of values in to filter printers by order in config (e.g. `/index.html?printer=0` will return the first printer only if more than one is configured). 
-* "Full-Screen" mode - via querystring - (e.g. `/index.html?fullscreen=1`) - recommended for OrcaSlicer integration.
-* Lightweight - I like to leave a tab open all the time to monitor.  Both Mainsail and Fluidd use more resources than I would like for this use case.   Currently I have one printer running Mainsail using 160mb of browser memory and one running Fluidd using 243mb of memory where KlippyDash is using 63mb (based on Chrome tab memory).
- 
-## Warning!
-Before we move on, this project currently doesn't have many (any?) security features baked in and I am comfortable with that in my environment. But make sure you understand the implications of the moonraker.conf changes required to make this work in your environment, especially if you want to run it from a local folder.  This has been tested with Moonraker v0.8.
+**Температуры.** Таблица в стиле Fluidd и график на uPlot: промежуточные пунктирные линии
+сетки и значения в точке курсора, каждое цветом своей линии.
 
-## Installation 
-1. Host files on webserver of choice on your local network on a machine that has access to your printer.  I recommend just hosting it on the printer itself.
-   * You can open this from a local folder on a desktop if you configure your CORS policy appropriately.  This is only recommended in non-prod environments per moonraker documentation, and will not work if you want to integrate with OrcaSlicer device tab.
-2. Edit moonraker.conf - documentation here: https://moonraker.readthedocs.io/en/latest/configuration/#authorization
-   * Ensure `[trusted_clients]` is configured correclty for your network/server.
-   * Ensure `[cors_domains]` is configured correctly for your network/server
-3. Edit `settings.js`
-   * Settings are documented in comments.
-4. Integrate with OrcaSlicer device tab - **This requires hosting on a webserver AFAIK**
-   * `Connections/Physical Printer` -> `Device UI`:  `<url>/index.html?theme=orcaslicer&printer=0&fullscreen=1`
-5. Profit?
+**Ход печати.** Отдельная карточка с прогрессом, временем и z-offset, который читается
+напрямую из `gcode_move`, а не из конфигурации.
 
-## TODO
-* Add authentication
-* Add additional metrics
-  * Speed
-  * Flow
-  * Layers
-  * System Stats (load/cp/mem)
-* Add additional basic controls
-  * Restart firmware / Klipper
-  * Home / Temp Presets
-* Update to Websockets
-* Move settings to cookies / Add settings UI
-* More themes!
+**Наблюдение за печатью.** Служба `print-watchdog` смотрит в камеру через детектор Obico и
+при подозрении на спагетти шлёт уведомление в Telegram. Состояние показывает индикатор-глаз
+на дашборде, он же открывает журнал событий.
+
+**Связь.** Значок состояния связи поверх камеры: видно, когда принтер отвалился и как давно.
+
+**Настройки в интерфейсе.** `settings.json` правится прямо на странице, без текстового
+редактора.
+
+**Камера.** Режим снимков или непрерывный поток, переключается на каждый принтер отдельно.
+
+## Установка
+
+Нужен Python 3. Клонируете, копируете пример настроек и правите под себя:
+
+```bash
+git clone https://github.com/<аккаунт>/KlippyDash-Dr.git
+cd KlippyDash-Dr
+cp src/settings.example.json src/settings.json
+```
+
+В `settings.json` укажите адреса принтеров — это адрес Moonraker или веб-морды, например
+`http://192.168.0.10:7125`. Остальные ключи описаны там же по месту.
+
+Запуск — одним файлом:
+
+```
+start-klippydash.bat
+```
+
+Поднимает три части разом и без консольных окон: локальный веб-сервер на `8899`, детектор
+`ml_api` на `3333` и службу наблюдения на `3334`. Останавливает всё
+`stop-klippydash.bat`, включая веб-сервер.
+
+Если наблюдение не нужно, достаточно `python serve.py` — дашборд работает сам по себе,
+индикатор-глаз просто покажет, что служба не запущена.
+
+## Уведомления в Telegram
+
+Создайте `print-watchdog/telegram_config.json`:
+
+```json
+{ "bot_token": "...", "chat_id": "..." }
+```
+
+Файл исключён через `.gitignore` и в репозиторий не попадает. Подробности —
+в [print-watchdog/README.md](print-watchdog/README.md).
+
+## Что не хранится в репозитории
+
+`src/settings.json` (адреса принтеров и состав оборудования конкретной установки),
+`print-watchdog/telegram_config.json` (токен бота), журнал событий и логи служб.
+
+## Происхождение и лицензии
+
+Основа — [KlippyDash](https://github.com/nixkor/KlippyDash) авторства nixkor, лицензия
+в файле [LICENSE](LICENSE). Апстрим подключён как remote `upstream`, обновления оттуда
+подтягиваются обычным `git fetch upstream`.
+
+Детектор дефектов в `print-watchdog/ml_api/` — вендоренная копия из проекта
+[Obico](https://github.com/TheSpaghettiDetective/obico-server) под AGPL-3.0, авторство
+принадлежит ему.
