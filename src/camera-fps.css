@@ -1,0 +1,39 @@
+/* camera-fps.css — счётчик кадров в углу изображения с камеры.
+   Левый верхний угол: справа вверху уже сидит индикатор связи (net-status.css), а правый
+   нижний занят штампом времени, который принтер впечатывает в сам кадр. */
+
+.cf-badge {
+	position: absolute;
+	top: 8px;
+	left: 8px;
+	z-index: 5;
+	display: none;                 /* показываем только когда есть что показать */
+	align-items: baseline;
+	gap: 3px;
+	padding: 2px 7px;
+	border-radius: 5px;
+	background: rgba(0, 0, 0, .55);
+	color: rgba(255, 255, 255, .85);
+	font-size: 11px;
+	line-height: 1.5;
+	font-variant-numeric: tabular-nums;
+	-webkit-user-select: none; user-select: none;
+	pointer-events: none;          /* не перехватывает клик по камере (полноэкранный режим) */
+	transition: opacity .2s ease;
+}
+.cf-badge.cf-on { display: flex; }
+
+.cf-value { font-weight: bold; }
+.cf-unit { font-size: 9px; opacity: .65; text-transform: uppercase; letter-spacing: .04em; }
+
+/* Настроенное значение из Moonraker, а не измеренное - показываем приглушённо и с тильдой,
+   чтобы цифру не принимали за факт. */
+.cf-badge.cf-nominal { color: rgba(255, 255, 255, .6); }
+
+/* Камера не отвечает - счётчик гасим, иначе он застынет на последнем значении и будет врать. */
+div.cam.cam-offline .cf-badge { opacity: 0; }
+
+@media (max-width: 560px) {
+	.cf-badge { top: 6px; left: 6px; padding: 1px 5px; font-size: 10px; }
+	.cf-unit { display: none; }
+}
